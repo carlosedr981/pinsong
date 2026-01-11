@@ -66,7 +66,7 @@ export default function Admin() {
   const [employees, setEmployees] = useState<EmployeeWithRegistros[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all_time");
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   
@@ -180,7 +180,7 @@ export default function Admin() {
       });
     }
 
-    if (dateFilter === "all") return registros;
+    if (dateFilter === "all_time") return registros;
 
     const today = new Date();
     const filterDate = new Date();
@@ -332,12 +332,12 @@ export default function Admin() {
               className="pl-10"
             />
           </div>
-          <Select value={dateFilter} onValueChange={handleDateFilterChange}>
+        <Select value={dateFilter} onValueChange={handleDateFilterChange}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all_time">Todos</SelectItem>
               <SelectItem value="today">Hoje</SelectItem>
               <SelectItem value="week">Última semana</SelectItem>
               <SelectItem value="month">Último mês</SelectItem>

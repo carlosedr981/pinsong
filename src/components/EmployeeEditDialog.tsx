@@ -58,7 +58,7 @@ export function EmployeeEditDialog({
 
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: {
+    values: {
       full_name: employee.full_name,
       email: employee.email || "",
       phone: employee.phone || "",
