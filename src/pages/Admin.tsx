@@ -1,0 +1,404 @@
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { 
+  Users, 
+  Calendar, 
+  LogOut, 
+  Loader2, 
+  ChevronDown,
+  Clock,
+  MapPin,
+  Image,
+  Shield,
+  Search
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string | null;
+  avatar_url: string | null;
+}
+
+interface Registro {
+  id: string;
+  timestamp: string;
+  photo_url: string;
+  latitude: number | null;
+  longitude: number | null;
+  user_id: string;
+}
+
+interface EmployeeWithRegistros extends Profile {
+  registros: Registro[];
+  isOpen: boolean;
+}
+
+export default function Admin() {
+  const [employees, setEmployees] = useState<EmployeeWithRegistros[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Check if user is admin
+  const checkAdminAccess = useCallback(async () => {
+    if (!user) {
+      navigate("/auth", { replace: true });
+      return false;
+    }
+
+    const { data, error } = await supabase.rpc("has_role", {
+      _user_id: user.id,
+      _role: "admin",
+    });
+
+    if (error || !data) {
+      toast({
+        variant: "destructive",
+        title: "Acesso negado",
+        description: "Você não tem permissão para acessar esta página.",
+      });
+      navigate("/", { replace: true });
+      return false;
+    }
+
+    return true;
+  }, [user, navigate, toast]);
+
+  // Fetch all employees and their registros
+  const fetchData = useCallback(async () => {
+    const isAdmin = await checkAdminAccess();
+    if (!isAdmin) return;
+
+    try {
+      // Fetch all profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name");
+
+      if (profilesError) throw profilesError;
+
+      // Fetch all registros
+      const { data: registros, error: registrosError } = await supabase
+        .from("registros")
+        .select("*")
+        .order("timestamp", { ascending: false });
+
+      if (registrosError) throw registrosError;
+
+      // Combine profiles with their registros
+      const employeesWithRegistros: EmployeeWithRegistros[] = (profiles || []).map(
+        (profile) => ({
+          ...profile,
+          registros: (registros || []).filter((r) => r.user_id === profile.id),
+          isOpen: false,
+        })
+      );
+
+      setEmployees(employeesWithRegistros);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar dados",
+        description: "Não foi possível carregar os dados dos funcionários.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [checkAdminAccess, toast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const toggleEmployee = (employeeId: string) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id === employeeId ? { ...emp, isOpen: !emp.isOpen } : emp
+      )
+    );
+  };
+
+  const getFilteredRegistros = (registros: Registro[]) => {
+    if (dateFilter === "all") return registros;
+
+    const today = new Date();
+    const filterDate = new Date();
+
+    switch (dateFilter) {
+      case "today":
+        return registros.filter(
+          (r) => new Date(r.timestamp).toDateString() === today.toDateString()
+        );
+      case "week":
+        filterDate.setDate(today.getDate() - 7);
+        return registros.filter((r) => new Date(r.timestamp) >= filterDate);
+      case "month":
+        filterDate.setMonth(today.getMonth() - 1);
+        return registros.filter((r) => new Date(r.timestamp) >= filterDate);
+      default:
+        return registros;
+    }
+  };
+
+  const filteredEmployees = employees.filter((emp) =>
+    emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    emp.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const totalRegistrosHoje = employees.reduce((acc, emp) => {
+    const today = new Date();
+    return (
+      acc +
+      emp.registros.filter(
+        (r) => new Date(r.timestamp).toDateString() === today.toDateString()
+      ).length
+    );
+  }, 0);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="gradient-hero p-4 pt-8 pb-6 rounded-b-[2rem]">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-background/20 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <p className="text-primary-foreground/80 text-sm">Painel</p>
+              <p className="text-primary-foreground font-semibold">Administrador</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/")}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              Dashboard
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="bg-background/10 border-0 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary-foreground/80" />
+                <span className="text-primary-foreground/80 text-sm">Funcionários</span>
+              </div>
+              <p className="text-2xl font-bold text-primary-foreground mt-1">
+                {employees.length}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="bg-background/10 border-0 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary-foreground/80" />
+                <span className="text-primary-foreground/80 text-sm">Registros Hoje</span>
+              </div>
+              <p className="text-2xl font-bold text-primary-foreground mt-1">
+                {totalRegistrosHoje}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="px-4 py-4">
+        <div className="flex gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar funcionário..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="week">Última semana</SelectItem>
+              <SelectItem value="month">Último mês</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Employee List */}
+      <div className="px-4 pb-8 space-y-3">
+        {filteredEmployees.length === 0 ? (
+          <Card className="border-0 shadow-md">
+            <CardContent className="py-12 text-center">
+              <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Nenhum funcionário encontrado</p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredEmployees.map((employee) => {
+            const filteredRegistros = getFilteredRegistros(employee.registros);
+            const initials = employee.full_name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+
+            return (
+              <Collapsible
+                key={employee.id}
+                open={employee.isOpen}
+                onOpenChange={() => toggleEmployee(employee.id)}
+              >
+                <Card className="border-0 shadow-md overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={employee.avatar_url || undefined} />
+                          <AvatarFallback className="bg-secondary text-secondary-foreground">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base truncate">
+                            {employee.full_name}
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {employee.email}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-primary">
+                            {filteredRegistros.length} registro
+                            {filteredRegistros.length !== 1 ? "s" : ""}
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              "h-5 w-5 text-muted-foreground transition-transform",
+                              employee.isOpen && "rotate-180"
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="p-4 pt-0 border-t">
+                      {filteredRegistros.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum registro no período selecionado
+                        </p>
+                      ) : (
+                        <div className="space-y-3 mt-4">
+                          {filteredRegistros.slice(0, 20).map((registro) => (
+                            <div
+                              key={registro.id}
+                              className="flex gap-3 p-3 rounded-lg bg-muted/50"
+                            >
+                              <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
+                                <img
+                                  src={registro.photo_url}
+                                  alt="Registro"
+                                  className="w-full h-full object-cover"
+                                />
+                                <Image className="absolute bottom-1 right-1 h-3 w-3 text-background/80" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-foreground">
+                                  {format(new Date(registro.timestamp), "HH:mm:ss")}
+                                </p>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {format(
+                                      new Date(registro.timestamp),
+                                      "dd/MM/yyyy - EEEE",
+                                      { locale: ptBR }
+                                    )}
+                                  </span>
+                                </div>
+                                {registro.latitude && registro.longitude && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                    <MapPin className="h-3 w-3" />
+                                    <span>
+                                      {registro.latitude.toFixed(4)},{" "}
+                                      {registro.longitude.toFixed(4)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {filteredRegistros.length > 20 && (
+                            <p className="text-sm text-muted-foreground text-center">
+                              + {filteredRegistros.length - 20} registros adicionais
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
