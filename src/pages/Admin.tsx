@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   Users, 
@@ -12,7 +12,8 @@ import {
   MapPin,
   Image,
   Shield,
-  Search
+  Search,
+  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,12 +35,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { PhotoDialog } from "@/components/PhotoDialog";
+import { EmployeeEditDialog } from "@/components/EmployeeEditDialog";
+import { DateRangePicker } from "@/components/DateRangePicker";
 
 interface Profile {
   id: string;
   full_name: string;
   email: string | null;
   avatar_url: string | null;
+  phone: string | null;
+  cpf: string | null;
 }
 
 interface Registro {
@@ -61,6 +67,14 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  
+  // Photo dialog state
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  
+  // Edit dialog state
+  const [editingEmployee, setEditingEmployee] = useState<Profile | null>(null);
   
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -148,6 +162,24 @@ export default function Admin() {
   };
 
   const getFilteredRegistros = (registros: Registro[]) => {
+    // If custom date range is set, use it
+    if (startDate || endDate) {
+      return registros.filter((r) => {
+        const registroDate = new Date(r.timestamp);
+        const start = startDate ? startOfDay(startDate) : null;
+        const end = endDate ? endOfDay(endDate) : null;
+        
+        if (start && end) {
+          return registroDate >= start && registroDate <= end;
+        } else if (start) {
+          return registroDate >= start;
+        } else if (end) {
+          return registroDate <= end;
+        }
+        return true;
+      });
+    }
+
     if (dateFilter === "all") return registros;
 
     const today = new Date();
@@ -171,7 +203,9 @@ export default function Admin() {
 
   const filteredEmployees = employees.filter((emp) =>
     emp.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    emp.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    emp.cpf?.includes(searchQuery) ||
+    emp.phone?.includes(searchQuery)
   );
 
   const totalRegistrosHoje = employees.reduce((acc, emp) => {
@@ -184,6 +218,22 @@ export default function Admin() {
     );
   }, 0);
 
+  // Clear date filter when custom range is set
+  useEffect(() => {
+    if (startDate || endDate) {
+      setDateFilter("custom");
+    }
+  }, [startDate, endDate]);
+
+  // Clear custom range when preset filter is selected
+  const handleDateFilterChange = (value: string) => {
+    setDateFilter(value);
+    if (value !== "custom") {
+      setStartDate(undefined);
+      setEndDate(undefined);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -194,6 +244,23 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Photo Dialog */}
+      <PhotoDialog
+        open={!!selectedPhoto}
+        onOpenChange={(open) => !open && setSelectedPhoto(null)}
+        photoUrl={selectedPhoto || ""}
+      />
+
+      {/* Edit Employee Dialog */}
+      {editingEmployee && (
+        <EmployeeEditDialog
+          open={!!editingEmployee}
+          onOpenChange={(open) => !open && setEditingEmployee(null)}
+          employee={editingEmployee}
+          onSave={fetchData}
+        />
+      )}
+
       {/* Header */}
       <div className="gradient-hero p-4 pt-8 pb-6 rounded-b-[2rem]">
         <div className="flex items-center justify-between mb-6">
@@ -254,18 +321,18 @@ export default function Admin() {
       </div>
 
       {/* Filters */}
-      <div className="px-4 py-4">
+      <div className="px-4 py-4 space-y-3">
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar funcionário..."
+              placeholder="Buscar por nome, email, CPF ou telefone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Select value={dateFilter} onValueChange={setDateFilter}>
+          <Select value={dateFilter} onValueChange={handleDateFilterChange}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
@@ -274,9 +341,20 @@ export default function Admin() {
               <SelectItem value="today">Hoje</SelectItem>
               <SelectItem value="week">Última semana</SelectItem>
               <SelectItem value="month">Último mês</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
         </div>
+        
+        {/* Date Range Picker */}
+        {(dateFilter === "custom" || startDate || endDate) && (
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+          />
+        )}
       </div>
 
       {/* Employee List */}
@@ -315,12 +393,30 @@ export default function Admin() {
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base truncate">
-                            {employee.full_name}
-                          </CardTitle>
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-base truncate">
+                              {employee.full_name}
+                            </CardTitle>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingEmployee(employee);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </div>
                           <p className="text-sm text-muted-foreground truncate">
                             {employee.email}
                           </p>
+                          {(employee.phone || employee.cpf) && (
+                            <p className="text-xs text-muted-foreground/70 truncate">
+                              {[employee.phone, employee.cpf].filter(Boolean).join(" • ")}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-primary">
@@ -350,7 +446,10 @@ export default function Admin() {
                               key={registro.id}
                               className="flex gap-3 p-3 rounded-lg bg-muted/50"
                             >
-                              <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
+                              <div 
+                                className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => setSelectedPhoto(registro.photo_url)}
+                              >
                                 <img
                                   src={registro.photo_url}
                                   alt="Registro"
