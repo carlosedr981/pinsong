@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { Clock, LogOut, Camera, History, User, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Clock, LogOut, Camera, History, Loader2, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { CameraCapture } from "@/components/CameraCapture";
-import { RegistroCard } from "@/components/RegistroCard";
+import { RegistroCardWithShare } from "@/components/RegistroCardWithShare";
+import { AvatarUpload } from "@/components/AvatarUpload";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,8 +27,11 @@ export default function Dashboard() {
   const [showCamera, setShowCamera] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   
   const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Update clock every second
@@ -36,6 +41,29 @@ export default function Dashboard() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Set avatar URL from profile
+  useEffect(() => {
+    if (profile?.avatar_url) {
+      setAvatarUrl(profile.avatar_url);
+    }
+  }, [profile]);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase.rpc("has_role", {
+        _user_id: user.id,
+        _role: "admin",
+      });
+      
+      setIsAdmin(!!data);
+    };
+    
+    checkAdmin();
+  }, [user]);
 
   // Fetch registros
   const fetchRegistros = useCallback(async () => {
@@ -165,9 +193,14 @@ export default function Dashboard() {
       <div className="gradient-hero p-4 pt-8 pb-20 rounded-b-[2rem]">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-background/20 flex items-center justify-center">
-              <User className="h-5 w-5 text-primary-foreground" />
-            </div>
+            {user && profile && (
+              <AvatarUpload
+                userId={user.id}
+                currentAvatarUrl={avatarUrl}
+                fullName={profile.full_name}
+                onAvatarUpdate={setAvatarUrl}
+              />
+            )}
             <div>
               <p className="text-primary-foreground/80 text-sm">Olá,</p>
               <p className="text-primary-foreground font-semibold">
@@ -175,14 +208,26 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={signOut}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/admin")}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+              >
+                <Shield className="h-5 w-5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Clock */}
@@ -256,7 +301,12 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-3">
             {registros.map((registro, index) => (
-              <RegistroCard key={registro.id} registro={registro} index={index} />
+              <RegistroCardWithShare 
+                key={registro.id} 
+                registro={registro} 
+                index={index}
+                fullName={profile?.full_name || "Funcionário"}
+              />
             ))}
           </div>
         )}
