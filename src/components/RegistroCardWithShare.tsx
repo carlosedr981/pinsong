@@ -15,6 +15,7 @@ interface Registro {
   photo_url: string;
   latitude?: number | null;
   longitude?: number | null;
+  address?: string | null;
 }
 
 interface RegistroCardWithShareProps {
@@ -45,13 +46,21 @@ export function RegistroCardWithShare({
   const isToday = new Date().toDateString() === date.toDateString();
 
   const handleShareWhatsApp = async () => {
+    // Build location string
+    let locationStr = "";
+    if (registro.address) {
+      locationStr = registro.address;
+    } else if (registro.latitude && registro.longitude) {
+      locationStr = `${registro.latitude.toFixed(6)}, ${registro.longitude.toFixed(6)}`;
+    }
+
     const message = 
       `📋 *Registro de Ponto*\n\n` +
       `👤 *Funcionário:* ${fullName}\n` +
       `📅 *Data:* ${formattedDate}\n` +
       `🕐 *Hora:* ${formattedTime}\n` +
       `📆 *Dia:* ${formattedDay}\n` +
-      `${registro.latitude && registro.longitude ? `📍 *Localização:* ${registro.latitude.toFixed(6)}, ${registro.longitude.toFixed(6)}\n` : ""}` +
+      `${locationStr ? `📍 *Localização:* ${locationStr}\n` : ""}` +
       `\n📷 *Foto:* ${registro.photo_url}`;
 
     // Try to use Web Share API with image
@@ -168,10 +177,10 @@ export function RegistroCardWithShare({
                   <Clock className="h-3 w-3" />
                   <span>{formattedDate}</span>
                 </div>
-                {registro.latitude && registro.longitude && (
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    <span>Localizado</span>
+                {(registro.address || (registro.latitude && registro.longitude)) && (
+                  <div className="flex items-center gap-1 max-w-[180px]">
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{registro.address || "Localizado"}</span>
                   </div>
                 )}
               </div>

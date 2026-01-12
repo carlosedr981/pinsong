@@ -23,6 +23,10 @@ export type Database = {
           full_name: string
           id: string
           phone: string | null
+          pix_bank: string | null
+          pix_beneficiary_cpf: string | null
+          pix_beneficiary_name: string | null
+          pix_beneficiary_phone: string | null
           pix_key: string | null
           updated_at: string
         }
@@ -34,6 +38,10 @@ export type Database = {
           full_name: string
           id: string
           phone?: string | null
+          pix_bank?: string | null
+          pix_beneficiary_cpf?: string | null
+          pix_beneficiary_name?: string | null
+          pix_beneficiary_phone?: string | null
           pix_key?: string | null
           updated_at?: string
         }
@@ -45,6 +53,10 @@ export type Database = {
           full_name?: string
           id?: string
           phone?: string | null
+          pix_bank?: string | null
+          pix_beneficiary_cpf?: string | null
+          pix_beneficiary_name?: string | null
+          pix_beneficiary_phone?: string | null
           pix_key?: string | null
           updated_at?: string
         }
@@ -52,6 +64,7 @@ export type Database = {
       }
       registros: {
         Row: {
+          address: string | null
           created_at: string
           id: string
           latitude: number | null
@@ -61,6 +74,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
           id?: string
           latitude?: number | null
@@ -70,6 +84,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          address?: string | null
           created_at?: string
           id?: string
           latitude?: number | null

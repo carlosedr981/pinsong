@@ -29,6 +29,10 @@ const profileSchema = z.object({
   phone: z.string().max(20, "Telefone muito longo").optional().or(z.literal("")),
   cpf: z.string().max(14, "CPF inválido").optional().or(z.literal("")),
   pix_key: z.string().max(100, "Chave PIX muito longa").optional().or(z.literal("")),
+  pix_bank: z.string().max(100, "Nome do banco muito longo").optional().or(z.literal("")),
+  pix_beneficiary_name: z.string().max(100, "Nome do favorecido muito longo").optional().or(z.literal("")),
+  pix_beneficiary_cpf: z.string().max(14, "CPF inválido").optional().or(z.literal("")),
+  pix_beneficiary_phone: z.string().max(20, "Telefone muito longo").optional().or(z.literal("")),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -39,6 +43,10 @@ interface Profile {
   phone: string | null;
   cpf: string | null;
   pix_key: string | null;
+  pix_bank: string | null;
+  pix_beneficiary_name: string | null;
+  pix_beneficiary_cpf: string | null;
+  pix_beneficiary_phone: string | null;
 }
 
 interface ProfileEditDialogProps {
@@ -58,6 +66,10 @@ export function ProfileEditDialog({ profile, onSave }: ProfileEditDialogProps) {
       phone: profile.phone || "",
       cpf: profile.cpf || "",
       pix_key: profile.pix_key || "",
+      pix_bank: profile.pix_bank || "",
+      pix_beneficiary_name: profile.pix_beneficiary_name || "",
+      pix_beneficiary_cpf: profile.pix_beneficiary_cpf || "",
+      pix_beneficiary_phone: profile.pix_beneficiary_phone || "",
     },
   });
 
@@ -87,6 +99,10 @@ export function ProfileEditDialog({ profile, onSave }: ProfileEditDialogProps) {
           phone: data.phone || null,
           cpf: data.cpf || null,
           pix_key: data.pix_key || null,
+          pix_bank: data.pix_bank || null,
+          pix_beneficiary_name: data.pix_beneficiary_name || null,
+          pix_beneficiary_cpf: data.pix_beneficiary_cpf || null,
+          pix_beneficiary_phone: data.pix_beneficiary_phone || null,
         })
         .eq("id", profile.id);
 
@@ -191,6 +207,80 @@ export function ProfileEditDialog({ profile, onSave }: ProfileEditDialogProps) {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="pix_bank"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Banco</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Nome do banco (ex: Nubank, Itaú)"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="border-t pt-4 mt-2">
+              <p className="text-sm text-muted-foreground mb-3">
+                Preencha abaixo se o favorecido for outra pessoa:
+              </p>
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="pix_beneficiary_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome do Favorecido</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Nome completo do favorecido"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="pix_beneficiary_cpf"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CPF do Favorecido</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="000.000.000-00"
+                          {...field}
+                          onChange={(e) => field.onChange(formatCPF(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="pix_beneficiary_phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone do Favorecido</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="(11) 99999-9999"
+                          {...field}
+                          onChange={(e) => field.onChange(formatPhone(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancelar

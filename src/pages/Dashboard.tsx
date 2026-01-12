@@ -11,6 +11,7 @@ import { RegistroCardWithShare } from "@/components/RegistroCardWithShare";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
+import { reverseGeocode } from "@/lib/geocoding";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -20,6 +21,7 @@ interface Registro {
   photo_url: string;
   latitude?: number | null;
   longitude?: number | null;
+  address?: string | null;
 }
 
 interface Profile {
@@ -29,6 +31,10 @@ interface Profile {
   phone: string | null;
   cpf: string | null;
   pix_key: string | null;
+  pix_bank: string | null;
+  pix_beneficiary_name: string | null;
+  pix_beneficiary_cpf: string | null;
+  pix_beneficiary_phone: string | null;
   avatar_url: string | null;
 }
 
@@ -67,6 +73,10 @@ export default function Dashboard() {
         phone: profile.phone || null,
         cpf: profile.cpf || null,
         pix_key: profile.pix_key || null,
+        pix_bank: profile.pix_bank || null,
+        pix_beneficiary_name: profile.pix_beneficiary_name || null,
+        pix_beneficiary_cpf: profile.pix_beneficiary_cpf || null,
+        pix_beneficiary_phone: profile.pix_beneficiary_phone || null,
         avatar_url: profile.avatar_url || null,
       });
     }
@@ -132,9 +142,10 @@ export default function Dashboard() {
       // Convert to blob
       const blob = dataURLtoBlob(watermarkedImage);
       
-      // Get geolocation (optional)
+      // Get geolocation and address
       let latitude: number | null = null;
       let longitude: number | null = null;
+      let address: string | null = null;
       
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -145,6 +156,12 @@ export default function Dashboard() {
         });
         latitude = position.coords.latitude;
         longitude = position.coords.longitude;
+        
+        // Reverse geocode to get address
+        const geocodeResult = await reverseGeocode(latitude, longitude);
+        if (geocodeResult) {
+          address = geocodeResult.address;
+        }
       } catch {
         // Geolocation not available or denied
       }
@@ -173,6 +190,7 @@ export default function Dashboard() {
           photo_url: publicUrl,
           latitude,
           longitude,
+          address,
         });
 
       if (insertError) throw insertError;
@@ -236,7 +254,9 @@ export default function Dashboard() {
       message += `📌 *Registro ${index + 1}*\n`;
       message += `📅 ${formattedDate} (${formattedDay})\n`;
       message += `🕐 ${formattedTime}\n`;
-      if (registro.latitude && registro.longitude) {
+      if (registro.address) {
+        message += `📍 ${registro.address}\n`;
+      } else if (registro.latitude && registro.longitude) {
         message += `📍 ${registro.latitude.toFixed(6)}, ${registro.longitude.toFixed(6)}\n`;
       }
       message += `📷 ${registro.photo_url}\n\n`;

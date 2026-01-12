@@ -10,6 +10,10 @@ interface Profile {
   phone: string | null;
   cpf: string | null;
   pix_key: string | null;
+  pix_bank: string | null;
+  pix_beneficiary_name: string | null;
+  pix_beneficiary_cpf: string | null;
+  pix_beneficiary_phone: string | null;
 }
 
 interface AuthContextType {

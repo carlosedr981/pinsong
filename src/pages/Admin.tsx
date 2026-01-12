@@ -47,6 +47,10 @@ interface Profile {
   phone: string | null;
   cpf: string | null;
   pix_key: string | null;
+  pix_bank: string | null;
+  pix_beneficiary_name: string | null;
+  pix_beneficiary_cpf: string | null;
+  pix_beneficiary_phone: string | null;
 }
 
 interface Registro {
@@ -423,6 +427,13 @@ export default function Admin() {
                               {employee.pix_key && (
                                 <p className="truncate">
                                   PIX: {employee.pix_key}
+                                  {employee.pix_bank && ` (${employee.pix_bank})`}
+                                </p>
+                              )}
+                              {employee.pix_beneficiary_name && (
+                                <p className="truncate">
+                                  Favorecido: {employee.pix_beneficiary_name}
+                                  {employee.pix_beneficiary_cpf && ` - ${employee.pix_beneficiary_cpf}`}
                                 </p>
                               )}
                             </div>
