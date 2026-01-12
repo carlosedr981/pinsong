@@ -15,7 +15,9 @@ import {
   Search,
   Pencil,
   Building2,
-  Trash2
+  Trash2,
+  ShieldCheck,
+  ShieldOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +65,7 @@ interface Profile {
   pix_beneficiary_name: string | null;
   pix_beneficiary_cpf: string | null;
   pix_beneficiary_phone: string | null;
+  environment_id: string | null;
 }
 
 interface Registro {
@@ -77,6 +80,12 @@ interface Registro {
 interface EmployeeWithRegistros extends Profile {
   registros: Registro[];
   isOpen: boolean;
+  isEnvironmentAdmin: boolean;
+}
+
+interface AdminRole {
+  user_id: string;
+  environment_id: string | null;
 }
 
 export default function Admin() {
@@ -97,42 +106,65 @@ export default function Admin() {
   const [deletingEmployee, setDeletingEmployee] = useState<Profile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  // Admin info state
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
+  const [currentAdminEnvironmentId, setCurrentAdminEnvironmentId] = useState<string | null>(null);
+  const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
+  
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Check if user is admin
+  // Check if user is admin and get admin type
   const checkAdminAccess = useCallback(async () => {
     if (!user) {
       navigate("/auth", { replace: true });
-      return false;
+      return null;
     }
 
-    const { data, error } = await supabase.rpc("has_role", {
+    // Check if user has admin role
+    const { data: hasRole, error: roleError } = await supabase.rpc("has_role", {
       _user_id: user.id,
       _role: "admin",
     });
 
-    if (error || !data) {
+    if (roleError || !hasRole) {
       toast({
         variant: "destructive",
         title: "Acesso negado",
         description: "Você não tem permissão para acessar esta página.",
       });
       navigate("/", { replace: true });
-      return false;
+      return null;
     }
 
-    return true;
+    // Get the admin's environment_id to determine if global or environment admin
+    const { data: adminRole, error: adminRoleError } = await supabase
+      .from("user_roles")
+      .select("environment_id")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .single();
+
+    if (adminRoleError) {
+      console.error("Error fetching admin role:", adminRoleError);
+      return null;
+    }
+
+    const isGlobal = adminRole.environment_id === null;
+    setIsGlobalAdmin(isGlobal);
+    setCurrentAdminEnvironmentId(adminRole.environment_id);
+
+    return { isGlobal, environmentId: adminRole.environment_id };
   }, [user, navigate, toast]);
 
   // Fetch all employees and their registros
   const fetchData = useCallback(async () => {
-    const isAdmin = await checkAdminAccess();
-    if (!isAdmin) return;
+    const adminInfo = await checkAdminAccess();
+    if (!adminInfo) return;
 
     try {
-      // Fetch all profiles
+      // Fetch all profiles - RLS will filter based on admin type
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("*")
@@ -140,7 +172,7 @@ export default function Admin() {
 
       if (profilesError) throw profilesError;
 
-      // Fetch all registros
+      // Fetch all registros - RLS will filter based on admin type
       const { data: registros, error: registrosError } = await supabase
         .from("registros")
         .select("*")
@@ -148,12 +180,38 @@ export default function Admin() {
 
       if (registrosError) throw registrosError;
 
-      // Combine profiles with their registros
-      const employeesWithRegistros: EmployeeWithRegistros[] = (profiles || []).map(
+      // Fetch all admin roles to know who is an environment admin
+      const { data: adminRoles, error: adminRolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, environment_id")
+        .eq("role", "admin");
+
+      if (adminRolesError) throw adminRolesError;
+
+      // Filter profiles based on admin type
+      let filteredProfiles = profiles || [];
+      
+      if (!adminInfo.isGlobal && adminInfo.environmentId) {
+        // Environment admin: only see employees in their environment, excluding global admins
+        const globalAdminIds = (adminRoles || [])
+          .filter(r => r.environment_id === null)
+          .map(r => r.user_id);
+        
+        filteredProfiles = filteredProfiles.filter(p => 
+          p.environment_id === adminInfo.environmentId && 
+          !globalAdminIds.includes(p.id)
+        );
+      }
+
+      // Combine profiles with their registros and admin status
+      const employeesWithRegistros: EmployeeWithRegistros[] = filteredProfiles.map(
         (profile) => ({
           ...profile,
           registros: (registros || []).filter((r) => r.user_id === profile.id),
           isOpen: false,
+          isEnvironmentAdmin: (adminRoles || []).some(
+            r => r.user_id === profile.id && r.environment_id !== null
+          ),
         })
       );
 
@@ -304,6 +362,58 @@ export default function Admin() {
     }
   };
 
+  // Toggle environment admin role
+  const handleToggleEnvironmentAdmin = async (employee: EmployeeWithRegistros) => {
+    if (!isGlobalAdmin || !employee.environment_id) return;
+    
+    setTogglingAdminId(employee.id);
+    try {
+      if (employee.isEnvironmentAdmin) {
+        // Remove admin role for this environment
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", employee.id)
+          .eq("role", "admin")
+          .eq("environment_id", employee.environment_id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Admin removido",
+          description: `${employee.full_name} não é mais admin do ambiente.`,
+        });
+      } else {
+        // Add admin role for this environment
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({
+            user_id: employee.id,
+            role: "admin",
+            environment_id: employee.environment_id,
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: "Admin adicionado",
+          description: `${employee.full_name} agora é admin do ambiente.`,
+        });
+      }
+
+      fetchData();
+    } catch (error: any) {
+      console.error("Error toggling admin:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error.message || "Não foi possível alterar o status de admin.",
+      });
+    } finally {
+      setTogglingAdminId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -370,19 +480,23 @@ export default function Admin() {
             </div>
             <div>
               <p className="text-primary-foreground/80 text-sm">Painel</p>
-              <p className="text-primary-foreground font-semibold">Administrador</p>
+              <p className="text-primary-foreground font-semibold">
+                {isGlobalAdmin ? "Admin Global" : "Admin do Ambiente"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/environments")}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
-            >
-              <Building2 className="h-4 w-4 mr-1" />
-              Ambientes
-            </Button>
+            {isGlobalAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/environments")}
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+              >
+                <Building2 className="h-4 w-4 mr-1" />
+                Ambientes
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -502,10 +616,41 @@ export default function Admin() {
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <CardTitle className="text-base truncate">
                               {employee.full_name}
                             </CardTitle>
+                            {employee.isEnvironmentAdmin && (
+                              <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                                Admin
+                              </span>
+                            )}
+                            {isGlobalAdmin && employee.environment_id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-6 w-6",
+                                  employee.isEnvironmentAdmin 
+                                    ? "text-primary hover:text-destructive" 
+                                    : "text-muted-foreground hover:text-primary"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleEnvironmentAdmin(employee);
+                                }}
+                                disabled={togglingAdminId === employee.id}
+                                title={employee.isEnvironmentAdmin ? "Remover admin" : "Tornar admin"}
+                              >
+                                {togglingAdminId === employee.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : employee.isEnvironmentAdmin ? (
+                                  <ShieldOff className="h-3 w-3" />
+                                ) : (
+                                  <ShieldCheck className="h-3 w-3" />
+                                )}
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
