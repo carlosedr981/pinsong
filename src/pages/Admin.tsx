@@ -14,7 +14,8 @@ import {
   Shield,
   Search,
   Pencil,
-  Building2
+  Building2,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,16 @@ import { cn } from "@/lib/utils";
 import { PhotoDialog } from "@/components/PhotoDialog";
 import { EmployeeEditDialog } from "@/components/EmployeeEditDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Profile {
   id: string;
@@ -81,6 +92,10 @@ export default function Admin() {
   
   // Edit dialog state
   const [editingEmployee, setEditingEmployee] = useState<Profile | null>(null);
+  
+  // Delete dialog state
+  const [deletingEmployee, setDeletingEmployee] = useState<Profile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -240,6 +255,55 @@ export default function Admin() {
     }
   };
 
+  // Delete employee handler
+  const handleDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+    
+    setIsDeleting(true);
+    try {
+      // Delete user roles first
+      const { error: rolesError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", deletingEmployee.id);
+
+      if (rolesError) throw rolesError;
+
+      // Delete registros
+      const { error: registrosError } = await supabase
+        .from("registros")
+        .delete()
+        .eq("user_id", deletingEmployee.id);
+
+      if (registrosError) throw registrosError;
+
+      // Delete profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", deletingEmployee.id);
+
+      if (profileError) throw profileError;
+
+      toast({
+        title: "Funcionário excluído",
+        description: `${deletingEmployee.full_name} foi excluído com sucesso.`,
+      });
+
+      setDeletingEmployee(null);
+      fetchData();
+    } catch (error: any) {
+      console.error("Error deleting employee:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: error.message || "Não foi possível excluir o funcionário.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -266,6 +330,36 @@ export default function Admin() {
           onSave={fetchData}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingEmployee} onOpenChange={(open) => !open && setDeletingEmployee(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir funcionário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deletingEmployee?.full_name}</strong>? 
+              Esta ação não pode ser desfeita e todos os registros deste funcionário serão excluídos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEmployee}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Header */}
       <div className="gradient-hero p-4 pt-8 pb-6 rounded-b-[2rem]">
@@ -422,6 +516,17 @@ export default function Admin() {
                               }}
                             >
                               <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingEmployee(employee);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                           <p className="text-sm text-muted-foreground truncate">
