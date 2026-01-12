@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Camera, History, Loader2, Shield } from "lucide-react";
+import { Clock, LogOut, Camera, History, Loader2, Shield, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CameraCapture } from "@/components/CameraCapture";
 import { RegistroCardWithShare } from "@/components/RegistroCardWithShare";
 import { AvatarUpload } from "@/components/AvatarUpload";
+import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -21,6 +22,16 @@ interface Registro {
   longitude?: number | null;
 }
 
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  cpf: string | null;
+  pix_key: string | null;
+  avatar_url: string | null;
+}
+
 export default function Dashboard() {
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +40,11 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isAdmin, setIsAdmin] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedRegistros, setSelectedRegistros] = useState<Set<string>>(new Set());
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
   
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -42,12 +56,21 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Set avatar URL from profile
+  // Set avatar URL and profile from auth profile
   useEffect(() => {
-    if (profile?.avatar_url) {
-      setAvatarUrl(profile.avatar_url);
+    if (profile) {
+      setAvatarUrl(profile.avatar_url || null);
+      setUserProfile({
+        id: user?.id || "",
+        full_name: profile.full_name,
+        email: profile.email || null,
+        phone: profile.phone || null,
+        cpf: profile.cpf || null,
+        pix_key: profile.pix_key || null,
+        avatar_url: profile.avatar_url || null,
+      });
     }
-  }, [profile]);
+  }, [profile, user]);
 
   // Check if user is admin
   useEffect(() => {
@@ -173,6 +196,77 @@ export default function Dashboard() {
     }
   };
 
+  const handleProfileSave = () => {
+    refetchProfile?.();
+  };
+
+  const toggleSelectRegistro = (id: string, selected: boolean) => {
+    setSelectedRegistros((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(id);
+      } else {
+        newSet.delete(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleShareMultiple = async () => {
+    const selected = registros.filter((r) => selectedRegistros.has(r.id));
+    if (selected.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Nenhum registro selecionado",
+        description: "Selecione pelo menos um registro para compartilhar.",
+      });
+      return;
+    }
+
+    const fullName = profile?.full_name || "Funcionário";
+    
+    let message = `📋 *Registros de Ponto*\n\n👤 *Funcionário:* ${fullName}\n\n`;
+    
+    selected.forEach((registro, index) => {
+      const date = new Date(registro.timestamp);
+      const formattedDate = format(date, "dd/MM/yyyy", { locale: ptBR });
+      const formattedTime = format(date, "HH:mm:ss");
+      const formattedDay = format(date, "EEEE", { locale: ptBR });
+      
+      message += `📌 *Registro ${index + 1}*\n`;
+      message += `📅 ${formattedDate} (${formattedDay})\n`;
+      message += `🕐 ${formattedTime}\n`;
+      if (registro.latitude && registro.longitude) {
+        message += `📍 ${registro.latitude.toFixed(6)}, ${registro.longitude.toFixed(6)}\n`;
+      }
+      message += `📷 ${registro.photo_url}\n\n`;
+    });
+
+    // Try Web Share API
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: message });
+        setSelectMode(false);
+        setSelectedRegistros(new Set());
+        return;
+      } catch (error) {
+        console.log("Web Share failed, falling back:", error);
+      }
+    }
+
+    // Fallback to WhatsApp
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, "_blank");
+    
+    setSelectMode(false);
+    setSelectedRegistros(new Set());
+    
+    toast({
+      title: "Compartilhamento via WhatsApp",
+      description: `${selected.length} registro(s) preparado(s) para envio.`,
+    });
+  };
+
   const lastRegistro = registros[0];
   const todayRegistros = registros.filter(
     (r) => new Date(r.timestamp).toDateString() === new Date().toDateString()
@@ -209,6 +303,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {userProfile && (
+              <ProfileEditDialog 
+                profile={userProfile} 
+                onSave={handleProfileSave}
+              />
+            )}
             {isAdmin && (
               <Button
                 variant="ghost"
@@ -279,9 +379,48 @@ export default function Dashboard() {
         </Card>
 
         {/* History Section */}
-        <div className="mb-4 flex items-center gap-2">
-          <History className="h-5 w-5 text-muted-foreground" />
-          <h2 className="font-semibold text-foreground">Últimos Registros</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-muted-foreground" />
+            <h2 className="font-semibold text-foreground">Últimos Registros</h2>
+          </div>
+          {registros.length > 0 && (
+            <div className="flex items-center gap-2">
+              {selectMode ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectMode(false);
+                      setSelectedRegistros(new Set());
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleShareMultiple}
+                    disabled={selectedRegistros.size === 0}
+                    className="gradient-primary"
+                  >
+                    <Share2 className="h-4 w-4 mr-1" />
+                    Enviar ({selectedRegistros.size})
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectMode(true)}
+                >
+                  <Share2 className="h-4 w-4 mr-1" />
+                  Selecionar
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -306,6 +445,9 @@ export default function Dashboard() {
                 registro={registro} 
                 index={index}
                 fullName={profile?.full_name || "Funcionário"}
+                selectable={selectMode}
+                selected={selectedRegistros.has(registro.id)}
+                onSelectChange={(selected) => toggleSelectRegistro(registro.id, selected)}
               />
             ))}
           </div>
