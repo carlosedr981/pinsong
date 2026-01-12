@@ -1,17 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Clock, Mail, Lock, User, Loader2, ArrowLeft } from "lucide-react";
+import { Clock, Mail, Lock, User, Loader2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido").max(255),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+  environmentSlug: z.string().optional(),
 });
 
 const signupSchema = loginSchema.extend({
@@ -23,6 +25,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [environmentSlug, setEnvironmentSlug] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -39,9 +42,9 @@ export default function Auth() {
   const validate = () => {
     try {
       if (isLogin) {
-        loginSchema.parse({ email, password });
+        loginSchema.parse({ email, password, environmentSlug });
       } else {
-        signupSchema.parse({ email, password, fullName });
+        signupSchema.parse({ email, password, fullName, environmentSlug });
       }
       setErrors({});
       return true;
@@ -59,6 +62,29 @@ export default function Auth() {
     }
   };
 
+  const verifyEnvironment = async (): Promise<string | null> => {
+    if (!environmentSlug.trim()) return null; // Environment is optional
+    
+    const slug = environmentSlug.toLowerCase().trim();
+    
+    const { data, error } = await supabase
+      .from("environments")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    
+    if (error || !data) {
+      toast({
+        variant: "destructive",
+        title: "Ambiente não encontrado",
+        description: "O código do ambiente informado não existe.",
+      });
+      return "not_found";
+    }
+    
+    return data.id;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -67,6 +93,13 @@ export default function Auth() {
     setLoading(true);
     
     try {
+      // Verify environment if provided
+      const envId = await verifyEnvironment();
+      if (envId === "not_found") {
+        setLoading(false);
+        return;
+      }
+
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
@@ -83,9 +116,18 @@ export default function Auth() {
               description: error.message,
             });
           }
+        } else if (envId) {
+          // Update user's environment after login
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            await supabase
+              .from("profiles")
+              .update({ environment_id: envId })
+              .eq("id", currentUser.id);
+          }
         }
       } else {
-        const { error } = await signUp(email, password, fullName);
+        const { error, data } = await signUp(email, password, fullName);
         if (error) {
           if (error.message.includes("already registered")) {
             toast({
@@ -101,6 +143,17 @@ export default function Auth() {
             });
           }
         } else {
+          // If signup successful and environment provided, update profile
+          if (envId && data?.user) {
+            // Wait a bit for the profile to be created by the trigger
+            setTimeout(async () => {
+              await supabase
+                .from("profiles")
+                .update({ environment_id: envId })
+                .eq("id", data.user!.id);
+            }, 1000);
+          }
+          
           toast({
             title: "Conta criada!",
             description: "Você já pode fazer login.",
@@ -199,6 +252,24 @@ export default function Auth() {
                 {errors.password && (
                   <p className="text-xs text-destructive">{errors.password}</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="environment">Código do Ambiente (Empresa)</Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="environment"
+                    placeholder="Ex: empresa-abc (opcional)"
+                    value={environmentSlug}
+                    onChange={(e) => setEnvironmentSlug(e.target.value.toLowerCase())}
+                    className="pl-10"
+                    disabled={loading}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Informe o código fornecido pela empresa
+                </p>
               </div>
 
               <Button

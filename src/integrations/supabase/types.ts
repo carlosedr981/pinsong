@@ -14,12 +14,37 @@ export type Database = {
   }
   public: {
     Tables: {
+      environments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           cpf: string | null
           created_at: string
           email: string | null
+          environment_id: string | null
           full_name: string
           id: string
           phone: string | null
@@ -35,6 +60,7 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string | null
+          environment_id?: string | null
           full_name: string
           id: string
           phone?: string | null
@@ -50,6 +76,7 @@ export type Database = {
           cpf?: string | null
           created_at?: string
           email?: string | null
+          environment_id?: string | null
           full_name?: string
           id?: string
           phone?: string | null
@@ -60,7 +87,15 @@ export type Database = {
           pix_key?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       registros: {
         Row: {
