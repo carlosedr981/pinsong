@@ -13,7 +13,8 @@ import {
   Image,
   Shield,
   Search,
-  Pencil
+  Pencil,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -279,6 +280,15 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/environments")}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              <Building2 className="h-4 w-4 mr-1" />
+              Ambientes
+            </Button>
             <Button
               variant="ghost"
               size="sm"
