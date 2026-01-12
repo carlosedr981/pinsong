@@ -46,6 +46,7 @@ interface Profile {
   avatar_url: string | null;
   phone: string | null;
   cpf: string | null;
+  pix_key: string | null;
 }
 
 interface Registro {
@@ -412,10 +413,19 @@ export default function Admin() {
                           <p className="text-sm text-muted-foreground truncate">
                             {employee.email}
                           </p>
-                          {(employee.phone || employee.cpf) && (
-                            <p className="text-xs text-muted-foreground/70 truncate">
-                              {[employee.phone, employee.cpf].filter(Boolean).join(" • ")}
-                            </p>
+                          {(employee.phone || employee.cpf || employee.pix_key) && (
+                            <div className="text-xs text-muted-foreground/70 space-y-0.5">
+                              {(employee.phone || employee.cpf) && (
+                                <p className="truncate">
+                                  {[employee.phone, employee.cpf].filter(Boolean).join(" • ")}
+                                </p>
+                              )}
+                              {employee.pix_key && (
+                                <p className="truncate">
+                                  PIX: {employee.pix_key}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center gap-2">

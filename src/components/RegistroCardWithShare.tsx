@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, MapPin, Image, Share2 } from "lucide-react";
+import { Clock, MapPin, Image, Share2, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { PhotoDialog } from "@/components/PhotoDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -20,9 +21,19 @@ interface RegistroCardWithShareProps {
   registro: Registro;
   index: number;
   fullName: string;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelectChange?: (selected: boolean) => void;
 }
 
-export function RegistroCardWithShare({ registro, index, fullName }: RegistroCardWithShareProps) {
+export function RegistroCardWithShare({ 
+  registro, 
+  index, 
+  fullName,
+  selectable = false,
+  selected = false,
+  onSelectChange
+}: RegistroCardWithShareProps) {
   const [photoOpen, setPhotoOpen] = useState(false);
   const { toast } = useToast();
   
@@ -40,7 +51,8 @@ export function RegistroCardWithShare({ registro, index, fullName }: RegistroCar
       `📅 *Data:* ${formattedDate}\n` +
       `🕐 *Hora:* ${formattedTime}\n` +
       `📆 *Dia:* ${formattedDay}\n` +
-      `${registro.latitude && registro.longitude ? `📍 *Localização:* ${registro.latitude.toFixed(6)}, ${registro.longitude.toFixed(6)}\n` : ""}`;
+      `${registro.latitude && registro.longitude ? `📍 *Localização:* ${registro.latitude.toFixed(6)}, ${registro.longitude.toFixed(6)}\n` : ""}` +
+      `\n📷 *Foto:* ${registro.photo_url}`;
 
     // Try to use Web Share API with image
     if (navigator.share && navigator.canShare) {
@@ -65,15 +77,13 @@ export function RegistroCardWithShare({ registro, index, fullName }: RegistroCar
     }
 
     // Fallback to WhatsApp URL scheme
-    const encodedMessage = encodeURIComponent(
-      message + `\n📷 *Foto:* ${registro.photo_url}`
-    );
+    const encodedMessage = encodeURIComponent(message);
     
     window.open(`https://wa.me/?text=${encodedMessage}`, "_blank");
     
     toast({
       title: "Compartilhamento via link",
-      description: "Seu dispositivo não suporta envio de imagem direto. O link da foto foi incluído na mensagem.",
+      description: "O link da foto foi incluído na mensagem.",
     });
   };
   
@@ -95,9 +105,26 @@ export function RegistroCardWithShare({ registro, index, fullName }: RegistroCar
       >
         <CardContent className="p-0">
           <div className="flex gap-4">
+            {/* Selection Checkbox */}
+            {selectable && (
+              <div 
+                className="flex items-center pl-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Checkbox
+                  checked={selected}
+                  onCheckedChange={(checked) => onSelectChange?.(!!checked)}
+                  className="h-5 w-5"
+                />
+              </div>
+            )}
+            
             {/* Photo Thumbnail */}
             <div 
-              className="relative w-20 h-20 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              className={cn(
+                "relative w-20 h-20 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity",
+                selectable && "ml-0"
+              )}
               onClick={() => setPhotoOpen(true)}
             >
               <img
