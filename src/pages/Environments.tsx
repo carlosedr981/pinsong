@@ -657,12 +657,12 @@ export default function Environments() {
             )}
             <div className="space-y-2">
               <Label>Ambiente</Label>
-              <Select value={selectedEnvId} onValueChange={setSelectedEnvId}>
+              <Select value={selectedEnvId || "none"} onValueChange={(val) => setSelectedEnvId(val === "none" ? "" : val)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um ambiente" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem ambiente</SelectItem>
+                  <SelectItem value="none">Sem ambiente</SelectItem>
                   {environments.map(env => (
                     <SelectItem key={env.id} value={env.id}>
                       {env.name}
