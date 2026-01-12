@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 const loginSchema = z.object({
   email: z.string().email("Email inválido").max(255),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  environmentSlug: z.string().optional(),
+  environmentSlug: z.string().min(1, "Código do ambiente é obrigatório"),
 });
 
 const signupSchema = loginSchema.extend({
@@ -63,9 +63,12 @@ export default function Auth() {
   };
 
   const verifyEnvironment = async (): Promise<string | null> => {
-    if (!environmentSlug.trim()) return null; // Environment is optional
-    
     const slug = environmentSlug.toLowerCase().trim();
+    
+    if (!slug) {
+      setErrors((prev) => ({ ...prev, environmentSlug: "Código do ambiente é obrigatório" }));
+      return "not_found";
+    }
     
     const { data, error } = await supabase
       .from("environments")
@@ -74,10 +77,11 @@ export default function Auth() {
       .maybeSingle();
     
     if (error || !data) {
+      setErrors((prev) => ({ ...prev, environmentSlug: "Ambiente não encontrado" }));
       toast({
         variant: "destructive",
         title: "Ambiente não encontrado",
-        description: "O código do ambiente informado não existe.",
+        description: "O código do ambiente informado não existe. Verifique com sua empresa.",
       });
       return "not_found";
     }
@@ -255,20 +259,24 @@ export default function Auth() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="environment">Código do Ambiente (Empresa)</Label>
+                <Label htmlFor="environment">Código do Ambiente (Empresa) *</Label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="environment"
-                    placeholder="Ex: empresa-abc (opcional)"
+                    placeholder="Ex: empresa-abc"
                     value={environmentSlug}
                     onChange={(e) => setEnvironmentSlug(e.target.value.toLowerCase())}
                     className="pl-10"
                     disabled={loading}
+                    required
                   />
                 </div>
+                {errors.environmentSlug && (
+                  <p className="text-xs text-destructive">{errors.environmentSlug}</p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Informe o código fornecido pela empresa
+                  Informe o código fornecido pela sua empresa
                 </p>
               </div>
 
