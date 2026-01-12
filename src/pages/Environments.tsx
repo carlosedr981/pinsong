@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Plus, Building2, ArrowLeft, Pencil, Trash2, Users, 
-  Loader2, Search, ChevronDown 
+  Loader2, Search, ChevronDown, Shield, UserPlus, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ interface Environment {
   slug: string;
   created_at: string;
   employeeCount?: number;
+  admins?: EnvironmentAdmin[];
   isOpen?: boolean;
 }
 
@@ -60,6 +61,18 @@ interface Employee {
   cpf: string | null;
   avatar_url: string | null;
   environment_id: string | null;
+}
+
+interface EnvironmentAdmin {
+  id: string;
+  user_id: string;
+  environment_id: string;
+  profile: {
+    id: string;
+    full_name: string;
+    email: string | null;
+    avatar_url: string | null;
+  };
 }
 
 export default function Environments() {
@@ -76,6 +89,9 @@ export default function Environments() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedEnvId, setSelectedEnvId] = useState<string>("");
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
+  const [selectedEnvForAdmin, setSelectedEnvForAdmin] = useState<Environment | null>(null);
+  const [adminEmail, setAdminEmail] = useState("");
   
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -123,12 +139,58 @@ export default function Environments() {
 
       if (empError) throw empError;
 
-      // Count employees per environment
-      const envsWithCounts = (envData || []).map(env => ({
-        ...env,
-        employeeCount: (empData || []).filter(e => e.environment_id === env.id).length,
-        isOpen: false,
-      }));
+      // Fetch environment admins
+      const { data: adminRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("id, user_id, environment_id")
+        .eq("role", "admin")
+        .not("environment_id", "is", null);
+
+      if (rolesError) throw rolesError;
+
+      // Get admin profiles
+      const adminUserIds = (adminRoles || []).map(r => r.user_id);
+      let adminProfiles: Employee[] = [];
+      
+      if (adminUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url")
+          .in("id", adminUserIds);
+        
+        adminProfiles = (profiles || []) as Employee[];
+      }
+
+      // Combine data
+      const envsWithCounts = (envData || []).map(env => {
+        const envAdminRoles = (adminRoles || []).filter(r => r.environment_id === env.id);
+        const admins = envAdminRoles.map(role => {
+          const profile = adminProfiles.find(p => p.id === role.user_id);
+          return {
+            id: role.id,
+            user_id: role.user_id,
+            environment_id: role.environment_id,
+            profile: profile ? {
+              id: profile.id,
+              full_name: profile.full_name,
+              email: profile.email,
+              avatar_url: profile.avatar_url,
+            } : {
+              id: role.user_id,
+              full_name: "Usuário",
+              email: null,
+              avatar_url: null,
+            },
+          };
+        });
+
+        return {
+          ...env,
+          employeeCount: (empData || []).filter(e => e.environment_id === env.id).length,
+          admins,
+          isOpen: false,
+        };
+      });
 
       setEnvironments(envsWithCounts);
       setEmployees(empData || []);
@@ -290,6 +352,125 @@ export default function Environments() {
         variant: "destructive",
         title: "Erro ao atualizar",
         description: "Não foi possível atualizar o funcionário.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddAdmin = async () => {
+    if (!selectedEnvForAdmin || !adminEmail.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Email obrigatório",
+        description: "Digite o email do administrador.",
+      });
+      return;
+    }
+    
+    setSaving(true);
+    
+    try {
+      // Find user by email
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("email", adminEmail.trim().toLowerCase())
+        .maybeSingle();
+      
+      if (profileError) throw profileError;
+      
+      if (!profile) {
+        toast({
+          variant: "destructive",
+          title: "Usuário não encontrado",
+          description: "Nenhum usuário cadastrado com este email.",
+        });
+        setSaving(false);
+        return;
+      }
+      
+      // Check if already admin of this environment
+      const { data: existingRole } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", profile.id)
+        .eq("role", "admin")
+        .eq("environment_id", selectedEnvForAdmin.id)
+        .maybeSingle();
+      
+      if (existingRole) {
+        toast({
+          variant: "destructive",
+          title: "Já é administrador",
+          description: "Este usuário já é administrador deste ambiente.",
+        });
+        setSaving(false);
+        return;
+      }
+      
+      // Add admin role for this environment
+      const { error } = await supabase
+        .from("user_roles")
+        .insert({
+          user_id: profile.id,
+          role: "admin",
+          environment_id: selectedEnvForAdmin.id,
+        });
+      
+      if (error) throw error;
+      
+      // Also update user's environment_id if not set
+      await supabase
+        .from("profiles")
+        .update({ environment_id: selectedEnvForAdmin.id })
+        .eq("id", profile.id)
+        .is("environment_id", null);
+      
+      toast({
+        title: "Administrador adicionado!",
+        description: `${profile.full_name} agora é admin de ${selectedEnvForAdmin.name}.`,
+      });
+      
+      setAdminDialogOpen(false);
+      setAdminEmail("");
+      setSelectedEnvForAdmin(null);
+      fetchData();
+    } catch (error) {
+      console.error("Error adding admin:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao adicionar",
+        description: "Não foi possível adicionar o administrador.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveAdmin = async (adminRoleId: string, adminName: string) => {
+    setSaving(true);
+    
+    try {
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("id", adminRoleId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Administrador removido!",
+        description: `${adminName} não é mais admin deste ambiente.`,
+      });
+      
+      fetchData();
+    } catch (error) {
+      console.error("Error removing admin:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao remover",
+        description: "Não foi possível remover o administrador.",
       });
     } finally {
       setSaving(false);
@@ -514,53 +695,118 @@ export default function Environments() {
                   </CardHeader>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <CardContent className="p-4 pt-0 border-t">
-                    {getEnvironmentEmployees(env.id).length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhum funcionário neste ambiente
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {getEnvironmentEmployees(env.id).map(emp => {
-                          const initials = emp.full_name
-                            .split(" ")
-                            .map(n => n[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase();
-                          
-                          return (
-                            <div
-                              key={emp.id}
-                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                              onClick={() => {
-                                setSelectedEmployee(emp);
-                                setSelectedEnvId(emp.environment_id || "");
-                                setAssignDialogOpen(true);
-                              }}
-                            >
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={emp.avatar_url || undefined} />
+                  <CardContent className="p-4 pt-0 border-t space-y-4">
+                    {/* Admins Section */}
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Administradores</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEnvForAdmin(env);
+                            setAdminEmail("");
+                            setAdminDialogOpen(true);
+                          }}
+                        >
+                          <UserPlus className="h-3 w-3 mr-1" />
+                          Adicionar
+                        </Button>
+                      </div>
+                      {(!env.admins || env.admins.length === 0) ? (
+                        <p className="text-xs text-muted-foreground">
+                          Nenhum administrador definido
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {env.admins.map(admin => (
+                            <div key={admin.id} className="flex items-center gap-2 p-1.5 bg-background rounded">
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={admin.profile.avatar_url || undefined} />
                                 <AvatarFallback className="text-xs">
-                                  {initials}
+                                  {admin.profile.full_name.slice(0, 2).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {emp.full_name}
+                                <p className="text-xs font-medium truncate">
+                                  {admin.profile.full_name}
                                 </p>
                                 <p className="text-xs text-muted-foreground truncate">
-                                  {emp.email}
+                                  {admin.profile.email}
                                 </p>
                               </div>
-                              <Button variant="ghost" size="sm" className="text-xs">
-                                Alterar
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveAdmin(admin.id, admin.profile.full_name);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
                               </Button>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Employees Section */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">Funcionários</p>
+                      {getEnvironmentEmployees(env.id).length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum funcionário neste ambiente
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {getEnvironmentEmployees(env.id).map(emp => {
+                            const initials = emp.full_name
+                              .split(" ")
+                              .map(n => n[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase();
+                            
+                            return (
+                              <div
+                                key={emp.id}
+                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedEmployee(emp);
+                                  setSelectedEnvId(emp.environment_id || "");
+                                  setAssignDialogOpen(true);
+                                }}
+                              >
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={emp.avatar_url || undefined} />
+                                  <AvatarFallback className="text-xs">
+                                    {initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">
+                                    {emp.full_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {emp.email}
+                                  </p>
+                                </div>
+                                <Button variant="ghost" size="sm" className="text-xs">
+                                  Alterar
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </CollapsibleContent>
               </Collapsible>
@@ -679,6 +925,52 @@ export default function Environments() {
             <Button onClick={handleAssignEmployee} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Admin Dialog */}
+      <Dialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Administrador</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {selectedEnvForAdmin && (
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">{selectedEnvForAdmin.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Código: {selectedEnvForAdmin.slug}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="adminEmail">Email do Administrador</Label>
+              <Input
+                id="adminEmail"
+                type="email"
+                placeholder="admin@exemplo.com"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                O usuário precisa já estar cadastrado no sistema
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdminDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddAdmin} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Adicionar
             </Button>
           </DialogFooter>
         </DialogContent>
