@@ -104,9 +104,14 @@ export type Database = {
           id: string
           latitude: number | null
           longitude: number | null
+          paid: boolean
+          paid_at: string | null
+          paid_by: string | null
           photo_url: string
+          receipt_url: string | null
           timestamp: string
           user_id: string
+          value_per_registro: number
         }
         Insert: {
           address?: string | null
@@ -114,9 +119,14 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          paid?: boolean
+          paid_at?: string | null
+          paid_by?: string | null
           photo_url: string
+          receipt_url?: string | null
           timestamp?: string
           user_id: string
+          value_per_registro?: number
         }
         Update: {
           address?: string | null
@@ -124,9 +134,14 @@ export type Database = {
           id?: string
           latitude?: number | null
           longitude?: number | null
+          paid?: boolean
+          paid_at?: string | null
+          paid_by?: string | null
           photo_url?: string
+          receipt_url?: string | null
           timestamp?: string
           user_id?: string
+          value_per_registro?: number
         }
         Relationships: []
       }

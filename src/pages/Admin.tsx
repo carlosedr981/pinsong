@@ -17,12 +17,17 @@ import {
   Building2,
   Trash2,
   ShieldCheck,
-  ShieldOff
+  ShieldOff,
+  DollarSign,
+  CheckCircle2,
+  XCircle,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -42,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { PhotoDialog } from "@/components/PhotoDialog";
 import { EmployeeEditDialog } from "@/components/EmployeeEditDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { PaymentDialog } from "@/components/PaymentDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,6 +81,10 @@ interface Registro {
   latitude: number | null;
   longitude: number | null;
   user_id: string;
+  paid: boolean;
+  paid_at: string | null;
+  receipt_url: string | null;
+  value_per_registro: number;
 }
 
 interface EmployeeWithRegistros extends Profile {
@@ -105,6 +115,9 @@ export default function Admin() {
   // Delete dialog state
   const [deletingEmployee, setDeletingEmployee] = useState<Profile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Payment dialog state
+  const [payingEmployee, setPayingEmployee] = useState<EmployeeWithRegistros | null>(null);
   
   // Admin info state
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
@@ -471,6 +484,18 @@ export default function Admin() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Payment Dialog */}
+      {payingEmployee && (
+        <PaymentDialog
+          open={!!payingEmployee}
+          onOpenChange={(open) => !open && setPayingEmployee(null)}
+          registros={payingEmployee.registros}
+          employeeId={payingEmployee.id}
+          employeeName={payingEmployee.full_name}
+          onSuccess={fetchData}
+        />
+      )}
+
       {/* Header */}
       <div className="gradient-hero p-4 pt-8 pb-6 rounded-b-[2rem]">
         <div className="flex items-center justify-between mb-6">
@@ -704,6 +729,20 @@ export default function Admin() {
                             {filteredRegistros.length} registro
                             {filteredRegistros.length !== 1 ? "s" : ""}
                           </span>
+                          {isGlobalAdmin && filteredRegistros.some(r => !r.paid) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs bg-success/10 text-success border-success/30 hover:bg-success/20"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPayingEmployee(employee);
+                              }}
+                            >
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              Pagar
+                            </Button>
+                          )}
                           <ChevronDown
                             className={cn(
                               "h-5 w-5 text-muted-foreground transition-transform",
@@ -739,9 +778,22 @@ export default function Admin() {
                                 <Image className="absolute bottom-1 right-1 h-3 w-3 text-background/80" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-foreground">
-                                  {format(new Date(registro.timestamp), "HH:mm:ss")}
-                                </p>
+                                <div className="flex items-center justify-between">
+                                  <p className="font-semibold text-foreground">
+                                    {format(new Date(registro.timestamp), "HH:mm:ss")}
+                                  </p>
+                                  {registro.paid ? (
+                                    <Badge className="bg-success/10 text-success border-0 flex items-center gap-1">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Pago
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-destructive/10 text-destructive border-0 flex items-center gap-1">
+                                      <XCircle className="h-3 w-3" />
+                                      Não Pago
+                                    </Badge>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
                                   <span>
@@ -760,6 +812,19 @@ export default function Admin() {
                                       {registro.longitude.toFixed(4)}
                                     </span>
                                   </div>
+                                )}
+                                {registro.receipt_url && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 mt-1 text-xs text-primary p-0"
+                                    asChild
+                                  >
+                                    <a href={registro.receipt_url} target="_blank" rel="noopener noreferrer">
+                                      <Download className="h-3 w-3 mr-1" />
+                                      Comprovante
+                                    </a>
+                                  </Button>
                                 )}
                               </div>
                             </div>
