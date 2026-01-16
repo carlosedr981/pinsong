@@ -74,3 +74,26 @@ export async function reverseGeocode(
     return null;
   }
 }
+
+// Calculate hours worked between registros (entrada/saída)
+export function calculateHoursWorked(registros: { timestamp: string }[]): number {
+  if (registros.length < 2) return 0;
+  
+  // Sort by timestamp
+  const sorted = [...registros].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+  
+  // Calculate hours between first and last registro
+  const first = new Date(sorted[0].timestamp);
+  const last = new Date(sorted[sorted.length - 1].timestamp);
+  const diffMs = last.getTime() - first.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  
+  return Math.max(0, diffHours);
+}
+
+// Calculate payment based on hours worked and hourly rate
+export function calculatePayment(hoursWorked: number, hourlyRate: number): number {
+  return hoursWorked * hourlyRate;
+}

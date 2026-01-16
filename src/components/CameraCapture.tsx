@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { Camera, X, RotateCcw, Check, Loader2 } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Camera, X, RotateCcw, Check, Loader2, SwitchCamera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -7,16 +7,22 @@ interface CameraCaptureProps {
   onCapture: (imageDataUrl: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
+  initialFacingMode?: "user" | "environment";
 }
 
-export function CameraCapture({ onCapture, onCancel, isProcessing }: CameraCaptureProps) {
+export function CameraCapture({ 
+  onCapture, 
+  onCancel, 
+  isProcessing,
+  initialFacingMode = "environment" 
+}: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">(initialFacingMode);
 
   const startCamera = useCallback(async () => {
     try {
@@ -53,6 +59,16 @@ export function CameraCapture({ onCapture, onCancel, isProcessing }: CameraCaptu
     stopCamera();
     setFacingMode(prev => prev === "user" ? "environment" : "user");
   }, [stopCamera]);
+
+  // Restart camera when facing mode changes
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [facingMode]);
 
   const takePhoto = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -95,10 +111,7 @@ export function CameraCapture({ onCapture, onCancel, isProcessing }: CameraCaptu
     onCancel();
   }, [stopCamera, onCancel]);
 
-  // Start camera on mount
-  useState(() => {
-    startCamera();
-  });
+  // Remove the useState initialization effect - we now use useEffect with facingMode dependency
 
   return (
     <div className="fixed inset-0 z-50 bg-foreground/95 flex flex-col">
@@ -190,7 +203,7 @@ export function CameraCapture({ onCapture, onCancel, isProcessing }: CameraCaptu
               disabled={!cameraReady}
               className="text-background hover:bg-background/10 flex flex-col gap-1 h-auto py-3"
             >
-              <RotateCcw className="h-6 w-6" />
+              <SwitchCamera className="h-6 w-6" />
               <span className="text-xs">Trocar</span>
             </Button>
             
