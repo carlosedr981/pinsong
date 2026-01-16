@@ -11,10 +11,11 @@ import { AvatarUpload } from "@/components/AvatarUpload";
 import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import { RegistrosHierarchy } from "@/components/RegistrosHierarchy";
 import { BalanceCard } from "@/components/BalanceCard";
-import { PhotoDialog } from "@/components/PhotoDialog";
+import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
+import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
-import { reverseGeocode } from "@/lib/geocoding";
-import { format } from "date-fns";
+import { reverseGeocode, calculateHoursWorked } from "@/lib/geocoding";
+import { format, getMonth, getYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Registro {
@@ -42,6 +43,11 @@ interface Profile {
   pix_beneficiary_cpf: string | null;
   pix_beneficiary_phone: string | null;
   avatar_url: string | null;
+  hourly_rate?: number | null;
+}
+
+interface AppSettings {
+  global_hourly_rate: number;
 }
 
 export default function Dashboard() {
@@ -54,6 +60,8 @@ export default function Dashboard() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [hourlyRate, setHourlyRate] = useState<number>(20);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   
   const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
@@ -67,24 +75,43 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Set avatar URL and profile from auth profile
+  // Set avatar URL and profile from auth profile + fetch hourly rate
   useEffect(() => {
-    if (profile) {
-      setAvatarUrl(profile.avatar_url || null);
-      setUserProfile({
-        id: user?.id || "",
-        full_name: profile.full_name,
-        email: profile.email || null,
-        phone: profile.phone || null,
-        cpf: profile.cpf || null,
-        pix_key: profile.pix_key || null,
-        pix_bank: profile.pix_bank || null,
-        pix_beneficiary_name: profile.pix_beneficiary_name || null,
-        pix_beneficiary_cpf: profile.pix_beneficiary_cpf || null,
-        pix_beneficiary_phone: profile.pix_beneficiary_phone || null,
-        avatar_url: profile.avatar_url || null,
-      });
-    }
+    const loadData = async () => {
+      if (profile) {
+        setAvatarUrl(profile.avatar_url || null);
+        setUserProfile({
+          id: user?.id || "",
+          full_name: profile.full_name,
+          email: profile.email || null,
+          phone: profile.phone || null,
+          cpf: profile.cpf || null,
+          pix_key: profile.pix_key || null,
+          pix_bank: profile.pix_bank || null,
+          pix_beneficiary_name: profile.pix_beneficiary_name || null,
+          pix_beneficiary_cpf: profile.pix_beneficiary_cpf || null,
+          pix_beneficiary_phone: profile.pix_beneficiary_phone || null,
+          avatar_url: profile.avatar_url || null,
+        });
+
+        // Fetch hourly rate (employee specific or global)
+        const employeeRate = (profile as any).hourly_rate;
+        if (employeeRate) {
+          setHourlyRate(Number(employeeRate));
+        } else {
+          // Fetch global rate
+          const { data: settings } = await supabase
+            .from("app_settings")
+            .select("value")
+            .eq("key", "global_hourly_rate")
+            .single();
+          if (settings) {
+            setHourlyRate(Number(settings.value));
+          }
+        }
+      }
+    };
+    loadData();
   }, [profile, user]);
 
   // Check if user is admin
@@ -229,19 +256,20 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Photo Dialog */}
-      <PhotoDialog
+      {/* Photo Zoom Dialog */}
+      <PhotoZoomDialog
         open={!!selectedPhoto}
         onOpenChange={(open) => !open && setSelectedPhoto(null)}
         photoUrl={selectedPhoto || ""}
       />
 
-      {/* Camera Overlay */}
+      {/* Camera Overlay - now starts with rear camera */}
       {showCamera && (
         <CameraCapture
           onCapture={handleCapture}
           onCancel={() => setShowCamera(false)}
           isProcessing={processing}
+          initialFacingMode="environment"
         />
       )}
 
@@ -340,9 +368,13 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Balance Card */}
+        {/* Balance Card with PDF Report */}
         {registros.length > 0 && (
-          <BalanceCard registros={registros} />
+          <BalanceCard 
+            registros={registros} 
+            hourlyRate={hourlyRate}
+            employeeName={profile?.full_name || ""}
+          />
         )}
 
         {/* Registros Hierarchy */}

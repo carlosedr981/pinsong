@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, getMonth, getYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Wallet, TrendingUp, ChevronDown } from "lucide-react";
+import { Wallet, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -10,19 +10,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
+import { calculateHoursWorked } from "@/lib/geocoding";
 
 interface Registro {
   id: string;
   timestamp: string;
   paid: boolean;
   value_per_registro: number;
+  photo_url?: string;
+  paid_at?: string | null;
+  receipt_url?: string | null;
+  address?: string | null;
 }
 
 interface BalanceCardProps {
   registros: Registro[];
+  hourlyRate?: number;
+  employeeName?: string;
 }
 
-export function BalanceCard({ registros }: BalanceCardProps) {
+export function BalanceCard({ registros, hourlyRate = 20, employeeName = "" }: BalanceCardProps) {
   const [filterMonth, setFilterMonth] = useState<string>("all");
 
   // Get available months from registros
@@ -54,31 +62,43 @@ export function BalanceCard({ registros }: BalanceCardProps) {
       .map(([key, value]) => ({ key, ...value }));
   }, [registros]);
 
-  // Calculate balances
-  const { totalPaid, totalPending, filteredPaid, filteredPending } = useMemo(() => {
+  // Calculate balances based on hours worked
+  const { totalPaid, totalPending, filteredPaid, filteredPending, filteredRegistros } = useMemo(() => {
+    // Group registros by day
+    const dayMap = new Map<string, Registro[]>();
+    registros.forEach((reg) => {
+      const dateKey = format(new Date(reg.timestamp), "yyyy-MM-dd");
+      if (!dayMap.has(dateKey)) dayMap.set(dateKey, []);
+      dayMap.get(dateKey)!.push(reg);
+    });
+
     let totalPaid = 0;
     let totalPending = 0;
     let filteredPaid = 0;
     let filteredPending = 0;
+    let filteredRegistros: Registro[] = [];
 
-    registros.forEach((registro) => {
-      const value = Number(registro.value_per_registro);
+    dayMap.forEach((dayRegs, dateKey) => {
+      const hours = calculateHoursWorked(dayRegs);
+      const dayValue = hours * hourlyRate;
+      const isPaid = dayRegs.every(r => r.paid);
       
-      if (registro.paid) {
-        totalPaid += value;
+      if (isPaid) {
+        totalPaid += dayValue;
       } else {
-        totalPending += value;
+        totalPending += dayValue;
       }
 
       // Apply filter
       if (filterMonth !== "all") {
         const [year, month] = filterMonth.split("-").map(Number);
-        const regDate = new Date(registro.timestamp);
+        const regDate = new Date(dateKey);
         if (getYear(regDate) === year && getMonth(regDate) === month) {
-          if (registro.paid) {
-            filteredPaid += value;
+          filteredRegistros = [...filteredRegistros, ...dayRegs];
+          if (isPaid) {
+            filteredPaid += dayValue;
           } else {
-            filteredPending += value;
+            filteredPending += dayValue;
           }
         }
       }
@@ -87,10 +107,11 @@ export function BalanceCard({ registros }: BalanceCardProps) {
     if (filterMonth === "all") {
       filteredPaid = totalPaid;
       filteredPending = totalPending;
+      filteredRegistros = registros;
     }
 
-    return { totalPaid, totalPending, filteredPaid, filteredPending };
-  }, [registros, filterMonth]);
+    return { totalPaid, totalPending, filteredPaid, filteredPending, filteredRegistros };
+  }, [registros, filterMonth, hourlyRate]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -126,6 +147,17 @@ export function BalanceCard({ registros }: BalanceCardProps) {
             </SelectContent>
           </Select>
         </div>
+        
+        {/* PDF Report Button */}
+        {filterMonth !== "all" && employeeName && (
+          <MonthlyReportDialog
+            registros={filteredRegistros}
+            employeeName={employeeName}
+            month={parseInt(filterMonth.split("-")[1])}
+            year={parseInt(filterMonth.split("-")[0])}
+            hourlyRate={hourlyRate}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="p-3 rounded-lg bg-background/50">

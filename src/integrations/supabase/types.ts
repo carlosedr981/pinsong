@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       environments: {
         Row: {
           created_at: string
@@ -46,6 +70,7 @@ export type Database = {
           email: string | null
           environment_id: string | null
           full_name: string
+          hourly_rate: number | null
           id: string
           phone: string | null
           pix_bank: string | null
@@ -62,6 +87,7 @@ export type Database = {
           email?: string | null
           environment_id?: string | null
           full_name: string
+          hourly_rate?: number | null
           id: string
           phone?: string | null
           pix_bank?: string | null
@@ -78,6 +104,7 @@ export type Database = {
           email?: string | null
           environment_id?: string | null
           full_name?: string
+          hourly_rate?: number | null
           id?: string
           phone?: string | null
           pix_bank?: string | null
