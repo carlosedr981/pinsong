@@ -11,6 +11,7 @@ import {
   Clock,
   MapPin,
   Image,
+  ImagePlus,
   Shield,
   Search,
   Pencil,
@@ -21,7 +22,8 @@ import {
   DollarSign,
   CheckCircle2,
   XCircle,
-  Download
+  Download,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +50,8 @@ import { PhotoDialog } from "@/components/PhotoDialog";
 import { EmployeeEditDialog } from "@/components/EmployeeEditDialog";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { PaymentDialog } from "@/components/PaymentDialog";
+import { GalleryCapture } from "@/components/GalleryCapture";
+import { HourlyRateDialog } from "@/components/HourlyRateDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,6 +122,12 @@ export default function Admin() {
   
   // Payment dialog state
   const [payingEmployee, setPayingEmployee] = useState<EmployeeWithRegistros | null>(null);
+  
+  // Gallery capture dialog state (for global admin to register point via gallery)
+  const [galleryDialogEmployee, setGalleryDialogEmployee] = useState<EmployeeWithRegistros | null>(null);
+  
+  // Hourly rate dialog state
+  const [hourlyRateDialogOpen, setHourlyRateDialogOpen] = useState(false);
   
   // Admin info state
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
@@ -484,6 +494,24 @@ export default function Admin() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Gallery Capture Dialog (Global Admin only) */}
+      {galleryDialogEmployee && (
+        <GalleryCapture
+          open={!!galleryDialogEmployee}
+          onOpenChange={(open) => !open && setGalleryDialogEmployee(null)}
+          userId={galleryDialogEmployee.id}
+          fullName={galleryDialogEmployee.full_name}
+          onSuccess={fetchData}
+        />
+      )}
+
+      {/* Hourly Rate Dialog (Global Admin only) */}
+      <HourlyRateDialog
+        open={hourlyRateDialogOpen}
+        onOpenChange={setHourlyRateDialogOpen}
+        employees={employees}
+      />
+
       {/* Payment Dialog */}
       {payingEmployee && (
         <PaymentDialog
@@ -512,15 +540,26 @@ export default function Admin() {
           </div>
           <div className="flex items-center gap-2">
             {isGlobalAdmin && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/environments")}
-                className="text-primary-foreground hover:bg-primary-foreground/10"
-              >
-                <Building2 className="h-4 w-4 mr-1" />
-                Ambientes
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setHourlyRateDialogOpen(true)}
+                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Settings className="h-4 w-4 mr-1" />
+                  Valores
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/environments")}
+                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                >
+                  <Building2 className="h-4 w-4 mr-1" />
+                  Ambientes
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"
@@ -729,7 +768,22 @@ export default function Admin() {
                             {filteredRegistros.length} registro
                             {filteredRegistros.length !== 1 ? "s" : ""}
                           </span>
-                          {isGlobalAdmin && filteredRegistros.some(r => !r.paid) && (
+                            {isGlobalAdmin && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setGalleryDialogEmployee(employee);
+                                }}
+                                title="Registrar ponto via galeria"
+                              >
+                                <ImagePlus className="h-3 w-3 mr-1" />
+                                Galeria
+                              </Button>
+                            )}
+                            {isGlobalAdmin && filteredRegistros.some(r => !r.paid) && (
                             <Button
                               size="sm"
                               variant="outline"
