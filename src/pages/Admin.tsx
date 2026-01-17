@@ -12,6 +12,7 @@ import {
   MapPin,
   Image,
   ImagePlus,
+  Plus,
   Shield,
   Search,
   Pencil,
@@ -52,6 +53,7 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { PaymentDialog } from "@/components/PaymentDialog";
 import { GalleryCapture } from "@/components/GalleryCapture";
 import { HourlyRateDialog } from "@/components/HourlyRateDialog";
+import { ManualRegistroDialog } from "@/components/ManualRegistroDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,6 +127,13 @@ export default function Admin() {
   
   // Gallery capture dialog state (for global admin to register point via gallery)
   const [galleryDialogEmployee, setGalleryDialogEmployee] = useState<EmployeeWithRegistros | null>(null);
+  
+  // Manual registro dialog state
+  const [manualRegistroEmployee, setManualRegistroEmployee] = useState<EmployeeWithRegistros | null>(null);
+  
+  // Delete registro state
+  const [deletingRegistro, setDeletingRegistro] = useState<{ id: string; employeeName: string } | null>(null);
+  const [isDeletingRegistro, setIsDeletingRegistro] = useState(false);
   
   // Hourly rate dialog state
   const [hourlyRateDialogOpen, setHourlyRateDialogOpen] = useState(false);
@@ -437,6 +446,38 @@ export default function Admin() {
     }
   };
 
+  // Delete registro handler
+  const handleDeleteRegistro = async () => {
+    if (!deletingRegistro) return;
+    
+    setIsDeletingRegistro(true);
+    try {
+      const { error } = await supabase
+        .from("registros")
+        .delete()
+        .eq("id", deletingRegistro.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Registro excluído",
+        description: `O registro foi excluído com sucesso.`,
+      });
+
+      setDeletingRegistro(null);
+      fetchData();
+    } catch (error: any) {
+      console.error("Error deleting registro:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: error.message || "Não foi possível excluir o registro.",
+      });
+    } finally {
+      setIsDeletingRegistro(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -494,6 +535,36 @@ export default function Admin() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete Registro Confirmation Dialog */}
+      <AlertDialog open={!!deletingRegistro} onOpenChange={(open) => !open && setDeletingRegistro(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este registro de <strong>{deletingRegistro?.employeeName}</strong>? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingRegistro}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRegistro}
+              disabled={isDeletingRegistro}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingRegistro ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Gallery Capture Dialog (Global Admin only) */}
       {galleryDialogEmployee && (
         <GalleryCapture
@@ -501,6 +572,17 @@ export default function Admin() {
           onOpenChange={(open) => !open && setGalleryDialogEmployee(null)}
           userId={galleryDialogEmployee.id}
           fullName={galleryDialogEmployee.full_name}
+          onSuccess={fetchData}
+        />
+      )}
+
+      {/* Manual Registro Dialog (Global Admin only) */}
+      {manualRegistroEmployee && (
+        <ManualRegistroDialog
+          open={!!manualRegistroEmployee}
+          onOpenChange={(open) => !open && setManualRegistroEmployee(null)}
+          userId={manualRegistroEmployee.id}
+          fullName={manualRegistroEmployee.full_name}
           onSuccess={fetchData}
         />
       )}
@@ -769,19 +851,34 @@ export default function Admin() {
                             {filteredRegistros.length !== 1 ? "s" : ""}
                           </span>
                             {isGlobalAdmin && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setGalleryDialogEmployee(employee);
-                                }}
-                                title="Registrar ponto via galeria"
-                              >
-                                <ImagePlus className="h-3 w-3 mr-1" />
-                                Galeria
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setManualRegistroEmployee(employee);
+                                  }}
+                                  title="Adicionar registro manual"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Adicionar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs bg-secondary/50 text-secondary-foreground border-secondary/30 hover:bg-secondary/70"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGalleryDialogEmployee(employee);
+                                  }}
+                                  title="Registrar ponto via galeria"
+                                >
+                                  <ImagePlus className="h-3 w-3 mr-1" />
+                                  Galeria
+                                </Button>
+                              </>
                             )}
                             {isGlobalAdmin && filteredRegistros.some(r => !r.paid) && (
                             <Button
@@ -818,8 +915,20 @@ export default function Admin() {
                           {filteredRegistros.slice(0, 20).map((registro) => (
                             <div
                               key={registro.id}
-                              className="flex gap-3 p-3 rounded-lg bg-muted/50"
+                              className="flex gap-3 p-3 rounded-lg bg-muted/50 relative group"
                             >
+                              {/* Delete button for Global Admin */}
+                              {isGlobalAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeletingRegistro({ id: registro.id, employeeName: employee.full_name })}
+                                  title="Excluir registro"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                               <div 
                                 className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => setSelectedPhoto(registro.photo_url)}
