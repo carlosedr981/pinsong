@@ -18,7 +18,7 @@ interface Registro {
   timestamp: string;
   paid: boolean;
   value_per_registro: number;
-  photo_url?: string;
+  photo_url: string;
   paid_at?: string | null;
   receipt_url?: string | null;
   address?: string | null;
