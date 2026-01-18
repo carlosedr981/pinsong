@@ -58,10 +58,15 @@ export function HourlyRateDialog({
 
     if (open) {
       fetchGlobalRate();
-      // Initialize employee rates
+    }
+  }, [open]);
+
+  // Update employee rates when employees change
+  useEffect(() => {
+    if (open) {
       const rates: Record<string, string> = {};
       employees.forEach((emp) => {
-        rates[emp.id] = emp.hourly_rate?.toString() || "";
+        rates[emp.id] = emp.hourly_rate != null ? emp.hourly_rate.toString() : "";
       });
       setEmployeeRates(rates);
     }
