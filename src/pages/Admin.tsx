@@ -607,39 +607,39 @@ export default function Admin() {
       )}
 
       {/* Header */}
-      <div className="gradient-hero p-4 pt-8 pb-6 rounded-b-[2rem]">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-background/20 flex items-center justify-center">
-              <Shield className="h-5 w-5 text-primary-foreground" />
+      <div className="gradient-hero p-4 pt-6 sm:pt-8 pb-6 rounded-b-[1.5rem] sm:rounded-b-[2rem]">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-background/20 flex items-center justify-center">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
             </div>
             <div>
-              <p className="text-primary-foreground/80 text-sm">Painel</p>
-              <p className="text-primary-foreground font-semibold">
+              <p className="text-primary-foreground/80 text-xs sm:text-sm">Painel</p>
+              <p className="text-primary-foreground font-semibold text-sm sm:text-base">
                 {isGlobalAdmin ? "Admin Global" : "Admin do Ambiente"}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {isGlobalAdmin && (
               <>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setHourlyRateDialogOpen(true)}
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                  className="text-primary-foreground hover:bg-primary-foreground/10 px-2 sm:px-3"
                 >
-                  <Settings className="h-4 w-4 mr-1" />
-                  Valores
+                  <Settings className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Valores</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => navigate("/environments")}
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                  className="text-primary-foreground hover:bg-primary-foreground/10 px-2 sm:px-3"
                 >
-                  <Building2 className="h-4 w-4 mr-1" />
-                  Ambientes
+                  <Building2 className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Ambientes</span>
                 </Button>
               </>
             )}
@@ -647,41 +647,42 @@ export default function Admin() {
               variant="ghost"
               size="sm"
               onClick={() => navigate("/")}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
+              className="text-primary-foreground hover:bg-primary-foreground/10 px-2 sm:px-3"
             >
-              Dashboard
+              <span className="hidden sm:inline">Dashboard</span>
+              <span className="sm:hidden text-xs">Home</span>
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={signOut}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
+              className="text-primary-foreground hover:bg-primary-foreground/10 h-8 w-8 sm:h-9 sm:w-9"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           <Card className="bg-background/10 border-0 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary-foreground/80" />
-                <span className="text-primary-foreground/80 text-sm">Funcionários</span>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground/80" />
+                <span className="text-primary-foreground/80 text-xs sm:text-sm">Funcionários</span>
               </div>
-              <p className="text-2xl font-bold text-primary-foreground mt-1">
+              <p className="text-xl sm:text-2xl font-bold text-primary-foreground mt-1">
                 {employees.length}
               </p>
             </CardContent>
           </Card>
           <Card className="bg-background/10 border-0 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary-foreground/80" />
-                <span className="text-primary-foreground/80 text-sm">Registros Hoje</span>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground/80" />
+                <span className="text-primary-foreground/80 text-xs sm:text-sm">Registros Hoje</span>
               </div>
-              <p className="text-2xl font-bold text-primary-foreground mt-1">
+              <p className="text-xl sm:text-2xl font-bold text-primary-foreground mt-1">
                 {totalRegistrosHoje}
               </p>
             </CardContent>
@@ -690,27 +691,27 @@ export default function Admin() {
       </div>
 
       {/* Filters */}
-      <div className="px-4 py-4 space-y-3">
-        <div className="flex gap-3">
+      <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-2 sm:space-y-3">
+        <div className="flex gap-2 sm:gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome, email, CPF ou telefone..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-9 h-10 text-sm"
             />
           </div>
-        <Select value={dateFilter} onValueChange={handleDateFilterChange}>
-            <SelectTrigger className="w-[140px]">
+          <Select value={dateFilter} onValueChange={handleDateFilterChange}>
+            <SelectTrigger className="w-[100px] sm:w-[140px] h-10 text-xs sm:text-sm">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all_time">Todos</SelectItem>
               <SelectItem value="today">Hoje</SelectItem>
-              <SelectItem value="week">Última semana</SelectItem>
-              <SelectItem value="month">Último mês</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
+              <SelectItem value="week">Semana</SelectItem>
+              <SelectItem value="month">Mês</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -727,9 +728,9 @@ export default function Admin() {
       </div>
 
       {/* Employee List */}
-      <div className="px-4 pb-8 space-y-3">
+      <div className="px-3 sm:px-4 pb-8 space-y-2 sm:space-y-3">
         {filteredEmployees.length === 0 ? (
-          <Card className="border-0 shadow-md">
+          <Card className="border-0 shadow-card">
             <CardContent className="py-12 text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">Nenhum funcionário encontrado</p>
@@ -751,107 +752,88 @@ export default function Admin() {
                 open={employee.isOpen}
                 onOpenChange={() => toggleEmployee(employee.id)}
               >
-                <Card className="border-0 shadow-md overflow-hidden">
+                <Card className="border-0 shadow-card overflow-hidden">
                   <CollapsibleTrigger asChild>
-                    <CardHeader className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12">
+                    <CardHeader className="p-3 sm:p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
                           <AvatarImage src={employee.avatar_url || undefined} />
-                          <AvatarFallback className="bg-secondary text-secondary-foreground">
+                          <AvatarFallback className="bg-secondary text-secondary-foreground text-xs sm:text-sm">
                             {initials}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1">
-                            <CardTitle className="text-base truncate">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <CardTitle className="text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
                               {employee.full_name}
                             </CardTitle>
                             {employee.isEnvironmentAdmin && (
-                              <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                              <span className="text-[10px] sm:text-xs bg-primary/10 text-primary px-1 sm:px-1.5 py-0.5 rounded-full">
                                 Admin
                               </span>
                             )}
-                            {isGlobalAdmin && employee.environment_id && (
+                            <div className="hidden sm:flex items-center gap-1">
+                              {isGlobalAdmin && employee.environment_id && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn(
+                                    "h-6 w-6",
+                                    employee.isEnvironmentAdmin 
+                                      ? "text-primary hover:text-destructive" 
+                                      : "text-muted-foreground hover:text-primary"
+                                  )}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleEnvironmentAdmin(employee);
+                                  }}
+                                  disabled={togglingAdminId === employee.id}
+                                  title={employee.isEnvironmentAdmin ? "Remover admin" : "Tornar admin"}
+                                >
+                                  {togglingAdminId === employee.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : employee.isEnvironmentAdmin ? (
+                                    <ShieldOff className="h-3 w-3" />
+                                  ) : (
+                                    <ShieldCheck className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className={cn(
-                                  "h-6 w-6",
-                                  employee.isEnvironmentAdmin 
-                                    ? "text-primary hover:text-destructive" 
-                                    : "text-muted-foreground hover:text-primary"
-                                )}
+                                className="h-6 w-6 text-muted-foreground hover:text-primary"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleToggleEnvironmentAdmin(employee);
+                                  setEditingEmployee(employee);
                                 }}
-                                disabled={togglingAdminId === employee.id}
-                                title={employee.isEnvironmentAdmin ? "Remover admin" : "Tornar admin"}
                               >
-                                {togglingAdminId === employee.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : employee.isEnvironmentAdmin ? (
-                                  <ShieldOff className="h-3 w-3" />
-                                ) : (
-                                  <ShieldCheck className="h-3 w-3" />
-                                )}
+                                <Pencil className="h-3 w-3" />
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingEmployee(employee);
-                              }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingEmployee(employee);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingEmployee(employee);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground truncate">
+                          <p className="text-xs sm:text-sm text-muted-foreground truncate">
                             {employee.email}
                           </p>
-                          {(employee.phone || employee.cpf || employee.pix_key) && (
-                            <div className="text-xs text-muted-foreground/70 space-y-0.5">
-                              {(employee.phone || employee.cpf) && (
-                                <p className="truncate">
-                                  {[employee.phone, employee.cpf].filter(Boolean).join(" • ")}
-                                </p>
-                              )}
-                              {employee.pix_key && (
-                                <p className="truncate">
-                                  PIX: {employee.pix_key}
-                                  {employee.pix_bank && ` (${employee.pix_bank})`}
-                                </p>
-                              )}
-                              {employee.pix_beneficiary_name && (
-                                <p className="truncate">
-                                  Favorecido: {employee.pix_beneficiary_name}
-                                  {employee.pix_beneficiary_cpf && ` - ${employee.pix_beneficiary_cpf}`}
-                                </p>
-                              )}
-                            </div>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-primary">
-                            {filteredRegistros.length} registro
-                            {filteredRegistros.length !== 1 ? "s" : ""}
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2">
+                          <span className="text-xs sm:text-sm font-medium text-primary whitespace-nowrap">
+                            {filteredRegistros.length} reg.
                           </span>
+                          <div className="flex items-center gap-1">
                             {isGlobalAdmin && (
-                              <>
+                              <div className="hidden sm:flex items-center gap-1">
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -863,7 +845,7 @@ export default function Admin() {
                                   title="Adicionar registro manual"
                                 >
                                   <Plus className="h-3 w-3 mr-1" />
-                                  Adicionar
+                                  Add
                                 </Button>
                                 <Button
                                   size="sm"
@@ -873,38 +855,79 @@ export default function Admin() {
                                     e.stopPropagation();
                                     setGalleryDialogEmployee(employee);
                                   }}
-                                  title="Registrar ponto via galeria"
+                                  title="Registrar via galeria"
                                 >
-                                  <ImagePlus className="h-3 w-3 mr-1" />
-                                  Galeria
+                                  <ImagePlus className="h-3 w-3" />
                                 </Button>
-                              </>
+                              </div>
                             )}
                             {isGlobalAdmin && filteredRegistros.some(r => !r.paid) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs bg-success/10 text-success border-success/30 hover:bg-success/20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPayingEmployee(employee);
+                                }}
+                              >
+                                <DollarSign className="h-3 w-3 sm:mr-1" />
+                                <span className="hidden sm:inline">Pagar</span>
+                              </Button>
+                            )}
+                            <ChevronDown
+                              className={cn(
+                                "h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground transition-transform",
+                                employee.isOpen && "rotate-180"
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      {/* Mobile action buttons */}
+                      <div className="flex sm:hidden items-center gap-1 mt-2 pt-2 border-t border-border/50">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingEmployee(employee);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Editar
+                        </Button>
+                        {isGlobalAdmin && (
+                          <>
                             <Button
+                              variant="ghost"
                               size="sm"
-                              variant="outline"
-                              className="h-7 text-xs bg-success/10 text-success border-success/30 hover:bg-success/20"
+                              className="h-8 text-xs flex-1"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPayingEmployee(employee);
+                                setManualRegistroEmployee(employee);
                               }}
                             >
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              Pagar
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add
                             </Button>
-                          )}
-                          <ChevronDown
-                            className={cn(
-                              "h-5 w-5 text-muted-foreground transition-transform",
-                              employee.isOpen && "rotate-180"
-                            )}
-                          />
-                        </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingEmployee(employee);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </CardHeader>
                   </CollapsibleTrigger>
-                  <CollapsibleContent>
                     <CardContent className="p-4 pt-0 border-t">
                       {filteredRegistros.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">

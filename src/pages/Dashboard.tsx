@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Camera, Loader2, Shield } from "lucide-react";
+import { Clock, LogOut, Camera, Loader2, Shield, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { RegistrosHierarchy } from "@/components/RegistrosHierarchy";
 import { BalanceCard } from "@/components/BalanceCard";
 import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
+import { TicketDialog } from "@/components/TicketDialog";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
 import { reverseGeocode, calculateHoursWorked } from "@/lib/geocoding";
 import { format, getMonth, getYear } from "date-fns";
@@ -292,13 +293,21 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {userProfile && (
               <ProfileEditDialog 
                 profile={userProfile} 
                 onSave={handleProfileSave}
               />
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/tickets")}
+              className="text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              <MessageSquare className="h-5 w-5" />
+            </Button>
             {isAdmin && (
               <Button
                 variant="ghost"
