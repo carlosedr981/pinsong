@@ -38,6 +38,41 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_of_day: {
+        Row: {
+          created_at: string
+          date: string
+          employee_id: string
+          environment_id: string | null
+          id: string
+          selected_by: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          employee_id: string
+          environment_id?: string | null
+          id?: string
+          selected_by: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          employee_id?: string
+          environment_id?: string | null
+          id?: string
+          selected_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_of_day_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       environments: {
         Row: {
           created_at: string
@@ -282,6 +317,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_environment_id_fkey"
+            columns: ["environment_id"]
+            isOneToOne: false
+            referencedRelation: "environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_schedules: {
+        Row: {
+          created_at: string
+          created_by: string
+          date: string
+          employee_id: string
+          end_time: string | null
+          environment_id: string | null
+          id: string
+          notes: string | null
+          shift_type: string | null
+          start_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          date: string
+          employee_id: string
+          end_time?: string | null
+          environment_id?: string | null
+          id?: string
+          notes?: string | null
+          shift_type?: string | null
+          start_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          date?: string
+          employee_id?: string
+          end_time?: string | null
+          environment_id?: string | null
+          id?: string
+          notes?: string | null
+          shift_type?: string | null
+          start_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedules_environment_id_fkey"
             columns: ["environment_id"]
             isOneToOne: false
             referencedRelation: "environments"
