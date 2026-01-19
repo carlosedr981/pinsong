@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft, MessageSquare, Shield } from "lucide-react";
+import { Loader2, ArrowLeft, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,7 @@ export default function Tickets() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -88,13 +87,13 @@ export default function Tickets() {
               <TabsTrigger value="closed" className="text-xs sm:text-sm">Fechados</TabsTrigger>
             </TabsList>
             <TabsContent value="all">
-              <TicketList isAdmin={true} refreshTrigger={refreshTrigger} />
+              <TicketList isAdmin={true} refreshTrigger={refreshTrigger} statusFilter="all" />
             </TabsContent>
             <TabsContent value="open">
-              <TicketList isAdmin={true} refreshTrigger={refreshTrigger} />
+              <TicketList isAdmin={true} refreshTrigger={refreshTrigger} statusFilter="open" />
             </TabsContent>
             <TabsContent value="closed">
-              <TicketList isAdmin={true} refreshTrigger={refreshTrigger} />
+              <TicketList isAdmin={true} refreshTrigger={refreshTrigger} statusFilter="closed" />
             </TabsContent>
           </Tabs>
         ) : (
