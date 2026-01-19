@@ -14,6 +14,8 @@ import { BalanceCard } from "@/components/BalanceCard";
 import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { TicketDialog } from "@/components/TicketDialog";
+import { EmployeeOfDayCard } from "@/components/EmployeeOfDayCard";
+import { WorkScheduleCard } from "@/components/WorkScheduleCard";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
 import { reverseGeocode, calculateHoursWorked } from "@/lib/geocoding";
 import { format, getMonth, getYear } from "date-fns";
@@ -58,10 +60,12 @@ export default function Dashboard() {
   const [processing, setProcessing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [hourlyRate, setHourlyRate] = useState<number>(20);
+  const [userEnvironmentId, setUserEnvironmentId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   
   const { user, profile, signOut, refetchProfile } = useAuth();
@@ -115,20 +119,44 @@ export default function Dashboard() {
     loadData();
   }, [profile, user]);
 
-  // Check if user is admin
+  // Check if user is admin and get environment
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAdminAndEnvironment = async () => {
       if (!user) return;
       
-      const { data } = await supabase.rpc("has_role", {
+      const { data: isAdminData } = await supabase.rpc("has_role", {
         _user_id: user.id,
         _role: "admin",
       });
       
-      setIsAdmin(!!data);
+      setIsAdmin(!!isAdminData);
+
+      // Check if global admin (environment_id is null)
+      if (isAdminData) {
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("environment_id")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .single();
+
+        setIsGlobalAdmin(roleData?.environment_id === null);
+        setUserEnvironmentId(roleData?.environment_id || null);
+      }
+
+      // Get user's environment from profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("environment_id")
+        .eq("id", user.id)
+        .single();
+
+      if (profileData?.environment_id) {
+        setUserEnvironmentId(profileData.environment_id);
+      }
     };
     
-    checkAdmin();
+    checkAdminAndEnvironment();
   }, [user]);
 
   // Fetch registros - all registros for hierarchy view
@@ -376,6 +404,25 @@ export default function Dashboard() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Employee of the Day - Only for Admins */}
+        {isAdmin && user && (
+          <EmployeeOfDayCard
+            isAdmin={isAdmin}
+            isGlobalAdmin={isGlobalAdmin}
+            userId={user.id}
+            environmentId={userEnvironmentId}
+          />
+        )}
+
+        {/* Work Schedule */}
+        {user && (
+          <WorkScheduleCard
+            isAdmin={isAdmin}
+            userId={user.id}
+            environmentId={userEnvironmentId}
+          />
+        )}
 
         {/* Balance Card with PDF Report */}
         {registros.length > 0 && (
