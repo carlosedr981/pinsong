@@ -928,24 +928,25 @@ export default function Admin() {
                       </div>
                     </CardHeader>
                   </CollapsibleTrigger>
-                    <CardContent className="p-4 pt-0 border-t">
+                  <CollapsibleContent>
+                    <CardContent className="p-3 sm:p-4 pt-0 border-t">
                       {filteredRegistros.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">
                           Nenhum registro no período selecionado
                         </p>
                       ) : (
-                        <div className="space-y-3 mt-4">
+                        <div className="space-y-2 sm:space-y-3 mt-3 sm:mt-4">
                           {filteredRegistros.slice(0, 20).map((registro) => (
                             <div
                               key={registro.id}
-                              className="flex gap-3 p-3 rounded-lg bg-muted/50 relative group"
+                              className="flex gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg bg-muted/50 relative group"
                             >
                               {/* Delete button for Global Admin */}
                               {isGlobalAdmin && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  className="absolute top-1 right-1 sm:top-2 sm:right-2 h-6 w-6 opacity-0 group-hover:opacity-100 sm:transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => setDeletingRegistro({ id: registro.id, employeeName: employee.full_name })}
                                   title="Excluir registro"
                                 >
@@ -953,7 +954,7 @@ export default function Admin() {
                                 </Button>
                               )}
                               <div 
-                                className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => setSelectedPhoto(registro.photo_url)}
                               >
                                 <img
@@ -961,39 +962,39 @@ export default function Admin() {
                                   alt="Registro"
                                   className="w-full h-full object-cover"
                                 />
-                                <Image className="absolute bottom-1 right-1 h-3 w-3 text-background/80" />
+                                <Image className="absolute bottom-0.5 right-0.5 sm:bottom-1 sm:right-1 h-3 w-3 text-background/80" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <p className="font-semibold text-foreground">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="font-semibold text-foreground text-sm sm:text-base">
                                     {format(new Date(registro.timestamp), "HH:mm:ss")}
                                   </p>
                                   {registro.paid ? (
-                                    <Badge className="bg-success/10 text-success border-0 flex items-center gap-1">
+                                    <Badge className="bg-success/10 text-success border-0 flex items-center gap-1 text-[10px] sm:text-xs">
                                       <CheckCircle2 className="h-3 w-3" />
-                                      Pago
+                                      <span className="hidden sm:inline">Pago</span>
                                     </Badge>
                                   ) : (
-                                    <Badge className="bg-destructive/10 text-destructive border-0 flex items-center gap-1">
+                                    <Badge className="bg-destructive/10 text-destructive border-0 flex items-center gap-1 text-[10px] sm:text-xs">
                                       <XCircle className="h-3 w-3" />
-                                      Não Pago
+                                      <span className="hidden sm:inline">Pendente</span>
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
-                                  <span>
+                                  <span className="truncate">
                                     {format(
                                       new Date(registro.timestamp),
-                                      "dd/MM/yyyy - EEEE",
+                                      "dd/MM/yyyy",
                                       { locale: ptBR }
                                     )}
                                   </span>
                                 </div>
                                 {registro.latitude && registro.longitude && (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                                    <MapPin className="h-3 w-3" />
-                                    <span>
+                                  <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">
                                       {registro.latitude.toFixed(4)},{" "}
                                       {registro.longitude.toFixed(4)}
                                     </span>
@@ -1003,7 +1004,7 @@ export default function Admin() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 mt-1 text-xs text-primary p-0"
+                                    className="h-5 sm:h-6 mt-1 text-[10px] sm:text-xs text-primary p-0"
                                     asChild
                                   >
                                     <a href={registro.receipt_url} target="_blank" rel="noopener noreferrer">
@@ -1016,7 +1017,7 @@ export default function Admin() {
                             </div>
                           ))}
                           {filteredRegistros.length > 20 && (
-                            <p className="text-sm text-muted-foreground text-center">
+                            <p className="text-xs sm:text-sm text-muted-foreground text-center">
                               + {filteredRegistros.length - 20} registros adicionais
                             </p>
                           )}

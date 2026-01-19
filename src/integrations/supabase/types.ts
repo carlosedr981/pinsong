@@ -176,6 +176,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          image_url: string | null
           is_admin_reply: boolean
           message: string
           ticket_id: string
@@ -184,6 +185,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          image_url?: string | null
           is_admin_reply?: boolean
           message: string
           ticket_id: string
@@ -192,6 +194,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          image_url?: string | null
           is_admin_reply?: boolean
           message?: string
           ticket_id?: string
@@ -209,9 +212,11 @@ export type Database = {
       }
       tickets: {
         Row: {
+          allow_reply: boolean
           created_at: string
           environment_id: string | null
           id: string
+          locked_by_admin: boolean
           priority: string
           status: string
           subject: string
@@ -219,9 +224,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allow_reply?: boolean
           created_at?: string
           environment_id?: string | null
           id?: string
+          locked_by_admin?: boolean
           priority?: string
           status?: string
           subject: string
@@ -229,9 +236,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allow_reply?: boolean
           created_at?: string
           environment_id?: string | null
           id?: string
+          locked_by_admin?: boolean
           priority?: string
           status?: string
           subject?: string
