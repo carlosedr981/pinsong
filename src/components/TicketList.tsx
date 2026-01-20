@@ -13,6 +13,7 @@ import {
   Unlock,
   Image as ImageIcon,
   X,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +78,7 @@ export function TicketList({ isAdmin = false, refreshTrigger, statusFilter = "al
   const [sendingReply, setSendingReply] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [togglingLock, setTogglingLock] = useState<string | null>(null);
+  const [deletingTicket, setDeletingTicket] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -280,6 +282,42 @@ export function TicketList({ isAdmin = false, refreshTrigger, statusFilter = "al
     }
   };
 
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este ticket? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+
+    setDeletingTicket(ticketId);
+    try {
+      // First delete all messages
+      const { error: messagesError } = await supabase
+        .from("ticket_messages")
+        .delete()
+        .eq("ticket_id", ticketId);
+
+      if (messagesError) throw messagesError;
+
+      // Then delete the ticket
+      const { error: ticketError } = await supabase
+        .from("tickets")
+        .delete()
+        .eq("id", ticketId);
+
+      if (ticketError) throw ticketError;
+
+      toast({ title: "Ticket excluído com sucesso!" });
+      fetchTickets();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: error.message,
+      });
+    } finally {
+      setDeletingTicket(null);
+    }
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
@@ -456,6 +494,22 @@ export function TicketList({ isAdmin = false, refreshTrigger, statusFilter = "al
                             <>
                               <Lock className="h-3 w-3 mr-1" />
                               Bloquear Resposta
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTicket(ticket.id)}
+                          disabled={deletingTicket === ticket.id}
+                          className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          {deletingTicket === ticket.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <>
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Excluir
                             </>
                           )}
                         </Button>
