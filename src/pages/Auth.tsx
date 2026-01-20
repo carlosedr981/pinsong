@@ -89,6 +89,54 @@ export default function Auth() {
     return data.id;
   };
 
+  const verifyUserEnvironmentAccess = async (userId: string, envId: string): Promise<boolean> => {
+    // Check if user's profile environment matches the login environment
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("environment_id, blocked")
+      .eq("id", userId)
+      .single();
+
+    if (!profile) return false;
+
+    // Check if user is blocked
+    if (profile.blocked) {
+      toast({
+        variant: "destructive",
+        title: "Acesso bloqueado",
+        description: "Seu acesso foi bloqueado. Entre em contato com o administrador.",
+      });
+      await supabase.auth.signOut();
+      return false;
+    }
+
+    // Check if user is a global admin (they can access any environment)
+    const { data: isGlobalAdmin } = await supabase
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .is("environment_id", null)
+      .maybeSingle();
+
+    if (isGlobalAdmin) {
+      return true; // Global admins can log into any environment
+    }
+
+    // If user has an environment_id, it must match the login environment
+    if (profile.environment_id && profile.environment_id !== envId) {
+      toast({
+        variant: "destructive",
+        title: "Ambiente incorreto",
+        description: "Você não pertence a este ambiente. Verifique o código com sua empresa.",
+      });
+      await supabase.auth.signOut();
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -121,13 +169,14 @@ export default function Auth() {
             });
           }
         } else if (envId) {
-          // Update user's environment after login
+          // Verify user access to this environment
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           if (currentUser) {
-            await supabase
-              .from("profiles")
-              .update({ environment_id: envId })
-              .eq("id", currentUser.id);
+            const hasAccess = await verifyUserEnvironmentAccess(currentUser.id, envId);
+            if (!hasAccess) {
+              setLoading(false);
+              return;
+            }
           }
         }
       } else {

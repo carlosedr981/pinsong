@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import { format, getMonth, getYear } from "date-fns";
+import { useMemo, useState, useEffect } from "react";
+import { format, getMonth, getYear, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Wallet, TrendingUp } from "lucide-react";
+import { Wallet, TrendingUp, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { calculateHoursWorked } from "@/lib/geocoding";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Registro {
   id: string;
@@ -24,14 +25,40 @@ interface Registro {
   address?: string | null;
 }
 
+interface WorkSchedule {
+  date: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
 interface BalanceCardProps {
   registros: Registro[];
   hourlyRate?: number;
   employeeName?: string;
+  userId?: string;
 }
 
-export function BalanceCard({ registros, hourlyRate = 20, employeeName = "" }: BalanceCardProps) {
+export function BalanceCard({ registros, hourlyRate = 20, employeeName = "", userId }: BalanceCardProps) {
   const [filterMonth, setFilterMonth] = useState<string>("all");
+  const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
+
+  // Fetch work schedules for the user
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      if (!userId) return;
+      
+      const { data } = await supabase
+        .from("work_schedules")
+        .select("date, start_time, end_time")
+        .eq("employee_id", userId);
+      
+      if (data) {
+        setSchedules(data);
+      }
+    };
+    
+    fetchSchedules();
+  }, [userId]);
 
   // Get available months from registros
   const availableMonths = useMemo(() => {
@@ -62,7 +89,21 @@ export function BalanceCard({ registros, hourlyRate = 20, employeeName = "" }: B
       .map(([key, value]) => ({ key, ...value }));
   }, [registros]);
 
-  // Calculate balances based on hours worked
+  // Calculate scheduled hours for a specific date
+  const getScheduledHoursForDate = (dateStr: string): number => {
+    const schedule = schedules.find(s => s.date === dateStr);
+    if (!schedule || !schedule.start_time || !schedule.end_time) return 0;
+    
+    const [startH, startM] = schedule.start_time.split(":").map(Number);
+    const [endH, endM] = schedule.end_time.split(":").map(Number);
+    
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    
+    return Math.max(0, (endMinutes - startMinutes) / 60);
+  };
+
+  // Calculate balances based on hours worked OR scheduled hours
   const { totalPaid, totalPending, filteredPaid, filteredPending, filteredRegistros } = useMemo(() => {
     // Group registros by day
     const dayMap = new Map<string, Registro[]>();
@@ -79,7 +120,11 @@ export function BalanceCard({ registros, hourlyRate = 20, employeeName = "" }: B
     let filteredRegistros: Registro[] = [];
 
     dayMap.forEach((dayRegs, dateKey) => {
-      const hours = calculateHoursWorked(dayRegs);
+      // Try to get scheduled hours first, fallback to actual hours worked
+      const scheduledHours = getScheduledHoursForDate(dateKey);
+      const actualHours = calculateHoursWorked(dayRegs);
+      const hours = scheduledHours > 0 ? scheduledHours : actualHours;
+      
       const dayValue = hours * hourlyRate;
       const isPaid = dayRegs.every(r => r.paid);
       
@@ -111,7 +156,7 @@ export function BalanceCard({ registros, hourlyRate = 20, employeeName = "" }: B
     }
 
     return { totalPaid, totalPending, filteredPaid, filteredPending, filteredRegistros };
-  }, [registros, filterMonth, hourlyRate]);
+  }, [registros, filterMonth, hourlyRate, schedules]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
