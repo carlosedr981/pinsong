@@ -24,7 +24,9 @@ import {
   CheckCircle2,
   XCircle,
   Download,
-  Settings
+  Settings,
+  Ban,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,6 +80,7 @@ interface Profile {
   pix_beneficiary_cpf: string | null;
   pix_beneficiary_phone: string | null;
   environment_id: string | null;
+  blocked: boolean;
 }
 
 interface Registro {
@@ -142,6 +145,7 @@ export default function Admin() {
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
   const [currentAdminEnvironmentId, setCurrentAdminEnvironmentId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
+  const [togglingBlockId, setTogglingBlockId] = useState<string | null>(null);
   
   const { user, signOut } = useAuth();
   const { toast } = useToast();
@@ -443,6 +447,37 @@ export default function Admin() {
       });
     } finally {
       setTogglingAdminId(null);
+    }
+  };
+
+  // Toggle block status for employee
+  const handleToggleBlock = async (employee: EmployeeWithRegistros) => {
+    setTogglingBlockId(employee.id);
+    try {
+      const newBlockedStatus = !employee.blocked;
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update({ blocked: newBlockedStatus })
+        .eq("id", employee.id);
+
+      if (error) throw error;
+
+      toast({
+        title: newBlockedStatus ? "Funcionário bloqueado" : "Funcionário desbloqueado",
+        description: `${employee.full_name} ${newBlockedStatus ? "não pode mais acessar o sistema" : "pode acessar o sistema novamente"}.`,
+      });
+
+      fetchData();
+    } catch (error: any) {
+      console.error("Error toggling block:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error.message || "Não foi possível alterar o status de bloqueio.",
+      });
+    } finally {
+      setTogglingBlockId(null);
     }
   };
 
@@ -767,6 +802,11 @@ export default function Admin() {
                             <CardTitle className="text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
                               {employee.full_name}
                             </CardTitle>
+                            {employee.blocked && (
+                              <span className="text-[10px] sm:text-xs bg-destructive/10 text-destructive px-1 sm:px-1.5 py-0.5 rounded-full">
+                                Bloqueado
+                              </span>
+                            )}
                             {employee.isEnvironmentAdmin && (
                               <span className="text-[10px] sm:text-xs bg-primary/10 text-primary px-1 sm:px-1.5 py-0.5 rounded-full">
                                 Admin
@@ -809,6 +849,30 @@ export default function Admin() {
                                 }}
                               >
                                 <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-6 w-6",
+                                  employee.blocked
+                                    ? "text-success hover:text-success"
+                                    : "text-muted-foreground hover:text-destructive"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleBlock(employee);
+                                }}
+                                disabled={togglingBlockId === employee.id}
+                                title={employee.blocked ? "Desbloquear acesso" : "Bloquear acesso"}
+                              >
+                                {togglingBlockId === employee.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : employee.blocked ? (
+                                  <CheckCircle className="h-3 w-3" />
+                                ) : (
+                                  <Ban className="h-3 w-3" />
+                                )}
                               </Button>
                               <Button
                                 variant="ghost"

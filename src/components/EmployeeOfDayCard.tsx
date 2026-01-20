@@ -143,7 +143,23 @@ export function EmployeeOfDayCard({
     }
   };
 
-  if (!isAdmin) return null;
+  if (loading) {
+    return (
+      <Card className="shadow-xl border-0 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Crown className="h-5 w-5 text-amber-500" />
+            Funcionário do Dia
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Always show the card, but only admins can select
 
   return (
     <Card className="shadow-xl border-0 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">

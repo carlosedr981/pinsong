@@ -405,8 +405,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Employee of the Day - Only for Admins */}
-        {isAdmin && user && (
+        {/* Employee of the Day - Visible to all users */}
+        {user && (
           <EmployeeOfDayCard
             isAdmin={isAdmin}
             isGlobalAdmin={isGlobalAdmin}
@@ -430,6 +430,7 @@ export default function Dashboard() {
             registros={registros} 
             hourlyRate={hourlyRate}
             employeeName={profile?.full_name || ""}
+            userId={user?.id}
           />
         )}
 
