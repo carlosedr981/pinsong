@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ImagePlus, Loader2, Check, X, Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,8 +38,41 @@ export function ManualRegistroDialog({
   const [customTime, setCustomTime] = useState<string>(format(new Date(), "HH:mm"));
   const [address, setAddress] = useState<string>("");
   const [processing, setProcessing] = useState(false);
+  const [hourlyRate, setHourlyRate] = useState<number>(20);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Fetch employee's hourly rate
+  useEffect(() => {
+    const fetchHourlyRate = async () => {
+      // First try employee-specific rate
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("hourly_rate")
+        .eq("id", userId)
+        .single();
+      
+      if (profile?.hourly_rate) {
+        setHourlyRate(Number(profile.hourly_rate));
+        return;
+      }
+      
+      // Fallback to global rate
+      const { data: settings } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "global_hourly_rate")
+        .single();
+      
+      if (settings) {
+        setHourlyRate(Number(settings.value));
+      }
+    };
+    
+    if (open && userId) {
+      fetchHourlyRate();
+    }
+  }, [open, userId]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -66,10 +99,29 @@ export function ManualRegistroDialog({
 
     setProcessing(true);
     try {
-      // Create timestamp from custom date/time
+      // Create timestamp from custom date/time using local components
       const [year, month, day] = customDate.split("-").map(Number);
       const [hours, minutes] = customTime.split(":").map(Number);
       const timestamp = new Date(year, month - 1, day, hours, minutes, 0);
+
+      // Calculate value based on work schedule for that date
+      let valuePerRegistro = hourlyRate;
+      
+      const { data: schedule } = await supabase
+        .from("work_schedules")
+        .select("start_time, end_time")
+        .eq("employee_id", userId)
+        .eq("date", customDate)
+        .single();
+      
+      if (schedule?.start_time && schedule?.end_time) {
+        const [startH, startM] = schedule.start_time.split(":").map(Number);
+        const [endH, endM] = schedule.end_time.split(":").map(Number);
+        const scheduledHours = (endH + endM / 60) - (startH + startM / 60);
+        if (scheduledHours > 0) {
+          valuePerRegistro = scheduledHours * hourlyRate;
+        }
+      }
 
       // Add watermark with custom timestamp
       const watermarkedImage = await addWatermarkToImage(selectedImage, {
@@ -95,7 +147,7 @@ export function ManualRegistroDialog({
         .from("registros-photos")
         .getPublicUrl(fileName);
 
-      // Save registro
+      // Save registro with calculated value
       const { error: insertError } = await supabase
         .from("registros")
         .insert({
@@ -103,6 +155,7 @@ export function ManualRegistroDialog({
           timestamp: timestamp.toISOString(),
           photo_url: publicUrl,
           address: address || null,
+          value_per_registro: valuePerRegistro,
         });
 
       if (insertError) throw insertError;

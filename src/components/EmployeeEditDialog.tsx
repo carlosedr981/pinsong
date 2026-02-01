@@ -140,8 +140,8 @@ export function EmployeeEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="sticky top-0 bg-background pt-2 pb-4 z-10">
           <DialogTitle>Editar Funcionário</DialogTitle>
         </DialogHeader>
         <Form {...form}>

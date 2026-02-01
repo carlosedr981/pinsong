@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft, MessageSquare } from "lucide-react";
+import { Loader2, ArrowLeft, MessageSquare, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { TicketDialog } from "@/components/TicketDialog";
 import { TicketList } from "@/components/TicketList";
+import { useTicketNotifications } from "@/hooks/useTicketNotifications";
 
 export default function Tickets() {
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,17 @@ export default function Tickets() {
 
     checkRole();
   }, [user, navigate]);
+
+  // Use ticket notifications
+  const { unreadCount, clearNotifications } = useTicketNotifications(isAdmin);
+
+  // Auto-refresh when there are notifications
+  useEffect(() => {
+    if (unreadCount > 0) {
+      setRefreshTrigger((prev) => prev + 1);
+      clearNotifications();
+    }
+  }, [unreadCount, clearNotifications]);
 
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);

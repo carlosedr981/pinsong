@@ -61,15 +61,22 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
   const [openMonths, setOpenMonths] = useState<Set<string>>(new Set());
   const [openDays, setOpenDays] = useState<Set<string>>(new Set());
 
+  // Helper function to parse date string as local date (avoiding UTC shift)
+  const parseDateKeyAsLocal = (dateKey: string): Date => {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Organize registros into hierarchy
   const hierarchy = useMemo(() => {
     const yearMap = new Map<number, Map<number, Map<string, Registro[]>>>();
 
     registros.forEach((registro) => {
       const date = new Date(registro.timestamp);
-      const year = getYear(date);
-      const month = getMonth(date);
-      const dateKey = format(date, "yyyy-MM-dd");
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      // Use local date components to create the dateKey
+      const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
       if (!yearMap.has(year)) {
         yearMap.set(year, new Map());
@@ -96,7 +103,8 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
         const days: DayData[] = [];
 
         dayMap.forEach((dayRegistros, dateKey) => {
-          const date = new Date(dateKey);
+          // Parse using local date to avoid timezone shifts
+          const date = parseDateKeyAsLocal(dateKey);
           const paidRegs = dayRegistros.filter((r) => r.paid);
           const unpaidRegs = dayRegistros.filter((r) => !r.paid);
 

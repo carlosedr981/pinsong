@@ -23,7 +23,12 @@ export function RegistroCard({ registro, index }: RegistroCardProps) {
   const formattedTime = format(date, "HH:mm:ss");
   const formattedDay = format(date, "EEEE", { locale: ptBR });
   
-  const isToday = new Date().toDateString() === date.toDateString();
+  // Compare dates using local date components to avoid timezone issues
+  const today = new Date();
+  const isToday = 
+    today.getFullYear() === date.getFullYear() &&
+    today.getMonth() === date.getMonth() &&
+    today.getDate() === date.getDate();
   
   return (
     <Card 

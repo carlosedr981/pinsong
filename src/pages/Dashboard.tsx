@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Camera, Loader2, Shield, MessageSquare } from "lucide-react";
+import { Clock, LogOut, Camera, Loader2, Shield, MessageSquare, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,7 @@ import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { TicketDialog } from "@/components/TicketDialog";
 import { EmployeeOfDayCard } from "@/components/EmployeeOfDayCard";
 import { WorkScheduleCard } from "@/components/WorkScheduleCard";
+import { useTicketNotifications } from "@/hooks/useTicketNotifications";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
 import { reverseGeocode, calculateHoursWorked } from "@/lib/geocoding";
 import { format, getMonth, getYear } from "date-fns";
@@ -71,6 +73,9 @@ export default function Dashboard() {
   const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Ticket notifications
+  const { unreadCount } = useTicketNotifications(isAdmin);
 
   // Update clock every second
   useEffect(() => {
@@ -226,6 +231,30 @@ export default function Dashboard() {
         // Geolocation not available or denied
       }
       
+      // Calculate value based on work schedule
+      let valuePerRegistro = hourlyRate; // Default to hourly rate (1 hour minimum)
+      
+      // Get the date in local format for schedule lookup
+      const dateStr = `${timestamp.getFullYear()}-${String(timestamp.getMonth() + 1).padStart(2, "0")}-${String(timestamp.getDate()).padStart(2, "0")}`;
+      
+      // Fetch work schedule for this date
+      const { data: schedule } = await supabase
+        .from("work_schedules")
+        .select("start_time, end_time")
+        .eq("employee_id", user.id)
+        .eq("date", dateStr)
+        .single();
+      
+      if (schedule?.start_time && schedule?.end_time) {
+        // Calculate hours from schedule
+        const [startH, startM] = schedule.start_time.split(":").map(Number);
+        const [endH, endM] = schedule.end_time.split(":").map(Number);
+        const scheduledHours = (endH + endM / 60) - (startH + startM / 60);
+        if (scheduledHours > 0) {
+          valuePerRegistro = scheduledHours * hourlyRate;
+        }
+      }
+      
       // Upload to storage
       const fileName = `${user.id}/${timestamp.getTime()}.jpg`;
       const { error: uploadError } = await supabase.storage
@@ -241,7 +270,7 @@ export default function Dashboard() {
         .from("registros-photos")
         .getPublicUrl(fileName);
       
-      // Save registro
+      // Save registro with calculated value
       const { error: insertError } = await supabase
         .from("registros")
         .insert({
@@ -251,6 +280,7 @@ export default function Dashboard() {
           latitude,
           longitude,
           address,
+          value_per_registro: valuePerRegistro,
         });
 
       if (insertError) throw insertError;
@@ -332,9 +362,14 @@ export default function Dashboard() {
               variant="ghost"
               size="icon"
               onClick={() => navigate("/tickets")}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
+              className="text-primary-foreground hover:bg-primary-foreground/10 relative"
             >
               <MessageSquare className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-destructive border-0">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Badge>
+              )}
             </Button>
             {isAdmin && (
               <Button
