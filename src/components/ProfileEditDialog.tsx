@@ -138,8 +138,8 @@ export function ProfileEditDialog({ profile, onSave }: ProfileEditDialogProps) {
           <User className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="sticky top-0 bg-background pt-2 pb-4 z-10">
           <DialogTitle>Editar Meu Perfil</DialogTitle>
         </DialogHeader>
         <Form {...form}>
