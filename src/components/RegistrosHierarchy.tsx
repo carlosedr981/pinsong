@@ -351,10 +351,6 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
                                             )}
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                          <Clock className="h-3 w-3" />
-                                          <span>{formatCurrency(Number(registro.value_per_registro))}</span>
-                                        </div>
                                         {registro.address ? (
                                           <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                                             <MapPin className="h-3 w-3" />
