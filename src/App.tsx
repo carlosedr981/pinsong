@@ -12,8 +12,16 @@ import EmployeeEnvironments from "./pages/EmployeeEnvironments";
 import Financial from "./pages/Financial";
 import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
+import { AdminScheduleExtension } from "@/components/AdminScheduleExtension";
 
 const queryClient = new QueryClient();
+
+const AdminWithSchedule = () => (
+  <>
+    <Admin />
+    <AdminScheduleExtension />
+  </>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -25,7 +33,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<AdminWithSchedule />} />
             <Route path="/environments" element={<Environments />} />
             <Route path="/employee-environments" element={<EmployeeEnvironments />} />
             <Route path="/financial" element={<Financial />} />
