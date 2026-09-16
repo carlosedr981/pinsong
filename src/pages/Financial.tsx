@@ -42,12 +42,14 @@ export default function Financial() {
         return;
       }
 
+      const [year, monthNumber] = month.split("-").map(Number);
+      const nextMonth = monthNumber === 12 ? `${year + 1}-01` : `${year}-${String(monthNumber + 1).padStart(2, "0")}`;
       const start = `${month}-01`;
-      const end = `${month}-31`;
+      const end = `${nextMonth}-01`;
       const [envResult, scheduleResult, registroResult, profileResult] = await Promise.all([
         db.from("environments").select("id, name").order("name"),
-        db.from("work_schedules").select("employee_id, environment_id, date, daily_rate").gte("date", start).lte("date", end),
-        db.from("registros").select("user_id, environment_id, timestamp, value_per_registro").gte("timestamp", `${start}T00:00:00`).lte("timestamp", `${end}T23:59:59`),
+        db.from("work_schedules").select("employee_id, environment_id, date, daily_rate").gte("date", start).lt("date", end),
+        db.from("registros").select("user_id, environment_id, timestamp, value_per_registro").gte("timestamp", `${start}T00:00:00`).lt("timestamp", `${end}T00:00:00`),
         db.from("profiles").select("id, full_name").order("full_name"),
       ]);
 
@@ -71,7 +73,7 @@ export default function Financial() {
   }, [user, month, navigate, toast]);
 
   const byEnvironment = useMemo(() => environments
-    .filter((env) => schedules.some((s) => s.environment_id === env.id))
+    .filter((env) => schedules.some((s) => s.environment_id === env.id && Number(s.daily_rate || 0) > 0))
     .map((env) => {
       const envSchedules = schedules.filter((s) => s.environment_id === env.id);
       const envRegistros = registros.filter((r) => r.environment_id === env.id);
