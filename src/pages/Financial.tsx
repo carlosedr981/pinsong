@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Building2, CalendarRange, DollarSign, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Building2, CalendarRange, Loader2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,17 +43,21 @@ export default function Financial() {
   const byEnvironment = useMemo(() => environments.map((env) => {
     const envSchedules = schedules.filter((s) => s.environment_id === env.id);
     const envRegistros = registros.filter((r) => r.environment_id === env.id);
-    const workedDays = new Set(envRegistros.map((r) => `${r.user_id}:${new Date(r.timestamp).toLocaleDateString("sv-SE")}`));
-    const payout = envSchedules.reduce((sum, s) => workedDays.has(`${s.employee_id}:${s.date}`) ? sum + Number(s.daily_rate || 0) : sum, 0);
+    const scheduledTotal = envSchedules.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const registeredTotal = envRegistros.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
     const employees = [...new Set(envSchedules.map((s) => s.employee_id))].map((id) => {
       const p = profiles.find((x) => x.id === id);
-      const first = envSchedules.filter((s) => s.employee_id === id);
-      const days1 = first.filter((s) => Number(s.date.slice(8, 10)) <= 15 && workedDays.has(`${id}:${s.date}`));
-      const days2 = first.filter((s) => Number(s.date.slice(8, 10)) > 15 && workedDays.has(`${id}:${s.date}`));
-      return { id, name: p?.full_name || "Funcionário", first: days1.reduce((a, s) => a + Number(s.daily_rate || 0), 0), second: days2.reduce((a, s) => a + Number(s.daily_rate || 0), 0) };
+      const employeeSchedules = envSchedules.filter((s) => s.employee_id === id);
+      const days1 = employeeSchedules.filter((s) => Number(s.date.slice(8, 10)) <= 15);
+      const days2 = employeeSchedules.filter((s) => Number(s.date.slice(8, 10)) > 15);
+      return {
+        id,
+        name: p?.full_name || "Funcionário",
+        first: days1.reduce((a, s) => a + Number(s.daily_rate || 0), 0),
+        second: days2.reduce((a, s) => a + Number(s.daily_rate || 0), 0),
+      };
     });
-    return { ...env, registeredTotal, payout, employees };
+    return { ...env, registeredTotal, scheduledTotal, payout: scheduledTotal, employees };
   }), [environments, schedules, registros, profiles]);
 
   const totals = byEnvironment.reduce((a, e) => ({ registered: a.registered + e.registeredTotal, payout: a.payout + e.payout }), { registered: 0, payout: 0 });
