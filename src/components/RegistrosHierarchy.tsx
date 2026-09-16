@@ -214,8 +214,8 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
           onOpenChange={() => toggleYear(yearData.year)}
         >
           <CollapsibleTrigger className="w-full">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
-              <div className="flex items-center gap-2">
+            <div className="flex items-start justify-between gap-2 rounded-lg bg-primary/10 p-3 transition-colors hover:bg-primary/20 sm:items-center">
+              <div className="flex min-w-0 flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-2">
                 <ChevronRight
                   className={cn(
                     "h-5 w-5 text-primary transition-transform",
@@ -248,8 +248,8 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
                     onOpenChange={() => toggleMonth(monthKey)}
                   >
                     <CollapsibleTrigger className="w-full">
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-start justify-between gap-2 rounded-lg bg-secondary/50 p-3 transition-colors hover:bg-secondary sm:items-center">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <ChevronRight
                             className={cn(
                               "h-4 w-4 text-foreground transition-transform",
@@ -261,7 +261,7 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
                             ({monthData.days.reduce((sum, d) => sum + d.registros.length, 0)} registros)
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex shrink-0 flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-2">
                           <span className="text-sm text-success font-medium">
                             {formatCurrency(monthData.paidValue)}
                           </span>
@@ -284,8 +284,8 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
                               onOpenChange={() => toggleDay(dayKey)}
                             >
                               <CollapsibleTrigger className="w-full">
-                                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                                  <div className="flex items-center gap-2">
+                                <div className="flex items-start justify-between gap-2 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted sm:items-center">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                                     <ChevronRight
                                       className={cn(
                                         "h-4 w-4 text-muted-foreground transition-transform",
@@ -300,7 +300,7 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
                                       ({dayData.registros.length} registro{dayData.registros.length !== 1 ? "s" : ""})
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
                                     {dayData.paidValue > 0 && (
                                       <Badge variant="outline" className="bg-success/10 text-success border-success/30">
                                         {formatCurrency(dayData.paidValue)}
@@ -315,11 +315,11 @@ export function RegistrosHierarchy({ registros, onPhotoClick }: RegistrosHierarc
                                 </div>
                               </CollapsibleTrigger>
                               <CollapsibleContent>
-                                <div className="ml-6 mt-2 space-y-2">
+                                <div className="ml-2 mt-2 space-y-2 sm:ml-6">
                                   {dayData.registros.map((registro) => (
                                     <div
                                       key={registro.id}
-                                      className="flex gap-3 p-3 rounded-lg bg-background border"
+                                      className="flex gap-2 rounded-lg border bg-background p-2 sm:gap-3 sm:p-3"
                                     >
                                       <div
                                         className="relative w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"

@@ -11,7 +11,6 @@ import { CameraCapture } from "@/components/CameraCapture";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import { RegistrosHierarchy } from "@/components/RegistrosHierarchy";
-import { BalanceCard } from "@/components/BalanceCard";
 import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { TicketDialog } from "@/components/TicketDialog";
@@ -68,7 +67,6 @@ export default function Dashboard() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [hourlyRate, setHourlyRate] = useState<number>(20);
   const [userEnvironmentId, setUserEnvironmentId] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -83,19 +81,18 @@ export default function Dashboard() {
   const lastRegistro = registros[0];
   const todayRegistros = registros.filter((r) => new Date(r.timestamp).toDateString() === new Date().toDateString());
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <PhotoZoomDialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)} photoUrl={selectedPhoto || ""} />
       {showCamera && <CameraCapture onCapture={handleCapture} onCancel={() => setShowCamera(false)} isProcessing={processing} initialFacingMode="environment" />}
-      <div className="gradient-hero p-4 pt-8 pb-20 rounded-b-[2rem]">
-        <div className="flex items-center justify-between mb-6"><div className="flex items-center gap-3">{user && profile && <AvatarUpload userId={user.id} currentAvatarUrl={avatarUrl} fullName={profile.full_name} onAvatarUpdate={setAvatarUrl} />}<div><p className="text-primary-foreground/80 text-sm">Olá,</p><p className="text-primary-foreground font-semibold">{profile?.full_name || "Funcionário"}</p></div></div><div className="flex items-center gap-1 sm:gap-2">{userProfile && <ProfileEditDialog profile={userProfile} onSave={handleProfileSave} />}<Button variant="ghost" size="icon" onClick={() => navigate("/tickets")} className="text-primary-foreground hover:bg-primary-foreground/10 relative"><MessageSquare className="h-5 w-5" />{unreadCount > 0 && <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-destructive border-0">{unreadCount > 9 ? "9+" : unreadCount}</Badge>}</Button>{isAdmin && <Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground hover:bg-primary-foreground/10"><Shield className="h-5 w-5" /></Button>}<Button variant="ghost" size="icon" onClick={signOut} className="text-primary-foreground hover:bg-primary-foreground/10"><LogOut className="h-5 w-5" /></Button></div></div>
-        <div className="text-center"><div className="flex items-center justify-center gap-2 mb-2"><Clock className="h-5 w-5 text-primary-foreground/80" /><span className="text-primary-foreground/80 text-sm">Hora Atual</span></div><p className="text-5xl font-bold text-primary-foreground tracking-tight">{format(currentTime, "HH:mm:ss")}</p><p className="text-primary-foreground/80 mt-1 capitalize">{format(currentTime, "EEEE, dd 'de' MMMM", { locale: ptBR })}</p></div>
+      <div className="gradient-hero rounded-b-[2rem] px-3 pb-20 pt-6 sm:p-4 sm:pb-20 sm:pt-8">
+        <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-2 sm:gap-3">{user && profile && <AvatarUpload userId={user.id} currentAvatarUrl={avatarUrl} fullName={profile.full_name} onAvatarUpdate={setAvatarUrl} />}<div className="min-w-0"><p className="text-primary-foreground/80 text-sm">Olá,</p><p className="truncate text-sm font-semibold text-primary-foreground sm:text-base">{profile?.full_name || "Funcionário"}</p></div></div><div className="flex shrink-0 items-center gap-0.5 sm:gap-2">{userProfile && <ProfileEditDialog profile={userProfile} onSave={handleProfileSave} />}<Button variant="ghost" size="icon" aria-label="Tickets" onClick={() => navigate("/tickets")} className="relative h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><MessageSquare className="h-5 w-5" />{unreadCount > 0 && <Badge className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center border-0 bg-destructive p-0 text-[10px]">{unreadCount > 9 ? "9+" : unreadCount}</Badge>}</Button>{isAdmin && <Button variant="ghost" size="icon" aria-label="Administração" onClick={() => navigate("/admin")} className="h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><Shield className="h-5 w-5" /></Button>}<Button variant="ghost" size="icon" aria-label="Sair" onClick={signOut} className="h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><LogOut className="h-5 w-5" /></Button></div></div>
+        <div className="text-center"><div className="mb-2 flex items-center justify-center gap-2"><Clock className="h-5 w-5 text-primary-foreground/80" /><span className="text-sm text-primary-foreground/80">Hora Atual</span></div><p className="text-4xl font-bold tracking-normal text-primary-foreground sm:text-5xl">{format(currentTime, "HH:mm:ss")}</p><p className="mt-1 px-2 text-sm capitalize text-primary-foreground/80 sm:text-base">{format(currentTime, "EEEE, dd 'de' MMMM", { locale: ptBR })}</p></div>
       </div>
-      <div className="px-4 -mt-12 pb-8 space-y-6">
-        <Card className="shadow-xl border-0 overflow-hidden"><CardContent className="p-6"><div className="flex items-center justify-between mb-4"><div><p className="text-sm text-muted-foreground">Status de Hoje</p><p className="text-lg font-semibold">{todayRegistros.length} registro{todayRegistros.length !== 1 ? "s" : ""}</p></div>{lastRegistro && <div className="text-right"><p className="text-sm text-muted-foreground">Último Registro</p><p className="text-lg font-semibold">{format(new Date(lastRegistro.timestamp), "HH:mm")}</p></div>}</div><Button onClick={() => setShowCamera(true)} className="w-full h-14 text-lg font-semibold gradient-primary shadow-glow" size="lg"><Camera className="h-6 w-6 mr-2" />Registrar Ponto</Button></CardContent></Card>
+      <div className="mx-auto -mt-12 max-w-3xl space-y-4 px-3 pb-8 sm:space-y-6 sm:px-4">
+        <Card className="overflow-hidden border-0 shadow-xl"><CardContent className="p-4 sm:p-6"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Status de Hoje</p><p className="text-base font-semibold sm:text-lg">{todayRegistros.length} registro{todayRegistros.length !== 1 ? "s" : ""}</p></div>{lastRegistro && <div className="shrink-0 text-right"><p className="text-sm text-muted-foreground">Último Registro</p><p className="text-base font-semibold sm:text-lg">{format(new Date(lastRegistro.timestamp), "HH:mm")}</p></div>}</div><Button onClick={() => setShowCamera(true)} className="h-14 w-full text-base font-semibold gradient-primary shadow-glow sm:text-lg" size="lg"><Camera className="mr-2 h-6 w-6" />Registrar Ponto</Button></CardContent></Card>
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
         <RegistrosHierarchy registros={registros} onPhotoClick={setSelectedPhoto} />
-        <BalanceCard registros={registros} hourlyRate={hourlyRate} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
-        <EmployeeOfDayCard />
+        {isAdmin && user && <EmployeeOfDayCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
       </div>
     </div>
   );
