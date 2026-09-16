@@ -6,8 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Admin from "./pages/Admin";
+import AdminHub from "./pages/AdminHub";
 import Environments from "./pages/Environments";
+import EmployeeEnvironments from "./pages/EmployeeEnvironments";
+import Financial from "./pages/Financial";
 import Tickets from "./pages/Tickets";
 import NotFound from "./pages/NotFound";
 
@@ -23,10 +25,11 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<AdminHub />} />
             <Route path="/environments" element={<Environments />} />
+            <Route path="/employee-environments" element={<EmployeeEnvironments />} />
+            <Route path="/financial" element={<Financial />} />
             <Route path="/tickets" element={<Tickets />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
