@@ -71,20 +71,12 @@ export function EmployeeEnvironmentAssignment({ employeeId }: EmployeeEnvironmen
     load();
   }, [user, employeeId, toast]);
 
-  const toggleEnvironment = (environmentId: string) => {
-    setSelectedEnvironmentIds((current) =>
-      current.includes(environmentId)
-        ? current.filter((id) => id !== environmentId)
-        : [...current, environmentId]
-    );
-  };
-
-  const save = async () => {
+  const persistAssignments = async (targetIds: string[], showToast = true) => {
     if (!employeeId || !isGlobalAdmin) return;
 
     setSaving(true);
     try {
-      const targetIds = [...new Set(selectedEnvironmentIds)];
+      const uniqueTargetIds = [...new Set(targetIds)];
       const { data: currentAssignments, error: currentError } = await db
         .from("employee_environments")
         .select("environment_id")
@@ -93,8 +85,8 @@ export function EmployeeEnvironmentAssignment({ employeeId }: EmployeeEnvironmen
       if (currentError) throw currentError;
 
       const currentIds = (currentAssignments || []).map((assignment: { environment_id: string }) => assignment.environment_id);
-      const toAdd = targetIds.filter((id) => !currentIds.includes(id));
-      const toRemove = currentIds.filter((id: string) => !targetIds.includes(id));
+      const toAdd = uniqueTargetIds.filter((id) => !currentIds.includes(id));
+      const toRemove = currentIds.filter((id: string) => !uniqueTargetIds.includes(id));
 
       if (toRemove.length > 0) {
         const { error } = await db
@@ -112,18 +104,32 @@ export function EmployeeEnvironmentAssignment({ employeeId }: EmployeeEnvironmen
         if (error) throw error;
       }
 
-      const activeEnvironmentId = targetIds[0] || null;
+      const { data: savedAssignments, error: verifyError } = await db
+        .from("employee_environments")
+        .select("environment_id")
+        .eq("user_id", employeeId);
+      if (verifyError) throw verifyError;
+
+      const savedIds = (savedAssignments || []).map((assignment: { environment_id: string }) => assignment.environment_id);
+      const savedCorrectly = savedIds.length === uniqueTargetIds.length && uniqueTargetIds.every((id) => savedIds.includes(id));
+      if (!savedCorrectly) throw new Error("Os ambientes selecionados não foram confirmados após o salvamento.");
+
+      const activeEnvironmentId = uniqueTargetIds[0] || null;
       const { error: profileError } = await db
         .from("profiles")
         .update({ environment_id: activeEnvironmentId, active_environment_id: activeEnvironmentId })
         .eq("id", employeeId);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.warn("Environment assignment saved, but active profile environment could not be updated:", profileError);
+      }
 
-      toast({
-        title: "Ambientes atualizados",
-        description: `${targetIds.length} ambiente(s) definido(s) para o funcionário.`,
-      });
+      if (showToast) {
+        toast({
+          title: "Ambientes atualizados",
+          description: `${uniqueTargetIds.length} ambiente(s) definido(s) para o funcionário.`,
+        });
+      }
     } catch (error: any) {
       console.error("Error saving employee environments:", error);
       toast({
@@ -134,6 +140,21 @@ export function EmployeeEnvironmentAssignment({ employeeId }: EmployeeEnvironmen
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleEnvironment = async (environmentId: string) => {
+    if (saving) return;
+
+    const nextIds = selectedEnvironmentIds.includes(environmentId)
+      ? selectedEnvironmentIds.filter((id) => id !== environmentId)
+      : [...selectedEnvironmentIds, environmentId];
+
+    setSelectedEnvironmentIds(nextIds);
+    await persistAssignments(nextIds);
+  };
+
+  const save = async () => {
+    await persistAssignments(selectedEnvironmentIds);
   };
 
   if (loading || !isGlobalAdmin) return null;
@@ -155,9 +176,10 @@ export function EmployeeEnvironmentAssignment({ employeeId }: EmployeeEnvironmen
               key={environment.id}
               type="button"
               onClick={() => toggleEnvironment(environment.id)}
+              disabled={saving}
               className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
                 checked ? "border-primary bg-primary/5" : "border-border hover:bg-muted"
-              }`}
+              } ${saving ? "opacity-70 cursor-wait" : ""}`}
             >
               <span className={`h-6 w-6 rounded-md border flex items-center justify-center shrink-0 ${checked ? "bg-primary text-primary-foreground border-primary" : ""}`}>
                 {checked && <Check className="h-4 w-4" />}
@@ -176,7 +198,7 @@ export function EmployeeEnvironmentAssignment({ employeeId }: EmployeeEnvironmen
 
       <Button type="button" variant="outline" onClick={save} disabled={saving} className="w-full">
         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Salvar ambientes
+        {saving ? "Salvando..." : "Salvar ambientes"}
       </Button>
     </div>
   );
