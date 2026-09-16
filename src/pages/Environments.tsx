@@ -129,7 +129,7 @@ export default function Environments() {
     try {
       const { error: assignmentError } = await supabase.from("employee_environments").delete().eq("environment_id", deletingEnv.id);
       if (assignmentError) throw assignmentError;
-      const { error: updateError } = await supabase.from("profiles").update({ environment_id: null, active_environment_id: null }).eq("environment_id", deletingEnv.id);
+      const { error: updateError } = await supabase.from("profiles").update({ environment_id: null }).eq("environment_id", deletingEnv.id);
       if (updateError) throw updateError;
       const { error } = await supabase.from("environments").delete().eq("id", deletingEnv.id);
       if (error) throw error;
@@ -151,7 +151,7 @@ export default function Environments() {
         const { error: insertError } = await supabase.from("employee_environments").insert({ user_id: selectedEmployee.id, environment_id: selectedEnvId });
         if (insertError) throw insertError;
       }
-      const { error: profileError } = await supabase.from("profiles").update({ environment_id: selectedEnvId || null, active_environment_id: selectedEnvId || null }).eq("id", selectedEmployee.id);
+      const { error: profileError } = await supabase.from("profiles").update({ environment_id: selectedEnvId || null }).eq("id", selectedEmployee.id);
       if (profileError) throw profileError;
       toast({ title: "Funcionário atualizado!", description: selectedEnvId ? "Funcionário vinculado ao ambiente." : "Funcionário removido do ambiente." });
       setAssignDialogOpen(false); setSelectedEmployee(null); setSelectedEnvId(""); await fetchData();
@@ -177,7 +177,7 @@ export default function Environments() {
         const { error: assignmentError } = await supabase.from("employee_environments").insert({ user_id: profile.id, environment_id: selectedEnvForAdmin.id });
         if (assignmentError) throw assignmentError;
       }
-      await supabase.from("profiles").update({ environment_id: selectedEnvForAdmin.id, active_environment_id: selectedEnvForAdmin.id }).eq("id", profile.id).is("environment_id", null);
+      await supabase.from("profiles").update({ environment_id: selectedEnvForAdmin.id }).eq("id", profile.id).is("environment_id", null);
       toast({ title: "Administrador adicionado!", description: `${profile.full_name} agora é admin de ${selectedEnvForAdmin.name}.` });
       setAdminDialogOpen(false); setAdminEmail(""); setSelectedEnvForAdmin(null); await fetchData();
     } catch (error: any) {
