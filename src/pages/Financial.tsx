@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Building2, CalendarRange, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Building2, CalendarRange, Check, Clipboard, Loader2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 const db = supabase as any;
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const getDay = (date: string | null | undefined) => Number(String(date || "").slice(8, 10)) || 0;
+const formatDate = (date: string) => {
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year}`;
+};
 
 export default function Financial() {
   const { user } = useAuth();
@@ -22,6 +26,7 @@ export default function Financial() {
   const [registros, setRegistros] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -48,7 +53,7 @@ export default function Financial() {
       const end = `${nextMonth}-01`;
       const [envResult, scheduleResult, registroResult, profileResult] = await Promise.all([
         db.from("environments").select("id, name").order("name"),
-        db.from("work_schedules").select("employee_id, environment_id, date, daily_rate").gte("date", start).lt("date", end),
+        db.from("work_schedules").select("employee_id, environment_id, date, start_time, end_time, daily_rate, shift_type, notes").gte("date", start).lt("date", end).order("date"),
         db.from("registros").select("user_id, environment_id, timestamp, value_per_registro").gte("timestamp", `${start}T00:00:00`).lt("timestamp", `${end}T00:00:00`),
         db.from("profiles").select("id, full_name").order("full_name"),
       ]);
@@ -94,15 +99,75 @@ export default function Financial() {
       return { ...env, registeredTotal, scheduledTotal, firstTotal, secondTotal, pendingTotal: scheduledTotal, employees };
     }), [environments, schedules, registros, profiles]);
 
+  const scheduleList = useMemo(() => byEnvironment.map((env) => ({
+    ...env,
+    schedules: env.employees.map((employee) => ({
+      ...employee,
+      schedules: schedules
+        .filter((s) => s.environment_id === env.id && s.employee_id === employee.id)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date))),
+    })),
+  })), [byEnvironment, schedules]);
+
+  const copyText = useMemo(() => {
+    const lines: string[] = [`ESCALAS - ${formatDate(`${month}-01`).slice(3)}`, ""];
+    scheduleList.forEach((env) => {
+      lines.push(`AMBIENTE: ${env.name}`);
+      env.schedules.forEach((employee: any) => {
+        lines.push(`Funcionário: ${employee.name}`);
+        employee.schedules.forEach((s: any) => {
+          const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)} às ${String(s.end_time).slice(0, 5)}` : "Horário não informado";
+          lines.push(`${formatDate(s.date)} | ${time} | ${money(Number(s.daily_rate || 0))}`);
+        });
+        lines.push("");
+      });
+      lines.push("");
+    });
+    return lines.join("\n").trim();
+  }, [scheduleList, month]);
+
+  const handleCopy = async () => {
+    if (!copyText) return;
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopied(true);
+      toast({ title: "Lista copiada", description: "Toda a escala do mês foi copiada para a área de transferência." });
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ variant: "destructive", title: "Não foi possível copiar", description: "Selecione e copie o texto manualmente." });
+    }
+  };
+
   const totals = byEnvironment.reduce((a, e) => ({ registered: a.registered + e.registeredTotal, pending: a.pending + e.pendingTotal }), { registered: 0, pending: 0 });
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return <div className="min-h-screen bg-background">
-    <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados diretamente das escalas lançadas e das diárias informadas.</p></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div>
+    <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados diretamente das escalas lançadas e das diárias informadas.</p></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div>
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="grid sm:grid-cols-2 gap-3"><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total registrado</p><p className="text-2xl font-bold">{money(totals.registered)}</p></CardContent></Card><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total pendente das escalas</p><p className="text-2xl font-bold">{money(totals.pending)}</p></CardContent></Card></div>
-      {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><div className="flex items-center gap-2 text-sm font-medium"><CalendarRange className="h-4 w-4" />1º pagamento — dias 1 a 15</div><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><div className="flex items-center gap-2 text-sm font-medium"><CalendarRange className="h-4 w-4" />2º pagamento — dias 16 a fim</div><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex items-center gap-3 border rounded-lg p-3"><Users className="h-4 w-4 text-muted-foreground" /><span className="font-medium flex-1">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
+
+      {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><div className="flex items-center gap-2 text-sm font-medium"><CalendarRange className="h-4 w-4" />1º pagamento — dias 1 a 15</div><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><div className="flex items-center gap-2 text-sm font-medium"><CalendarRange className="h-4 w-4" />2º pagamento — dias 16 a fim</div><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><Users className="h-4 w-4 text-muted-foreground" /><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
+
+      {scheduleList.length > 0 && <Card className="border-0 shadow-card">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1"><CardTitle className="text-base">Lista completa das escalas</CardTitle><p className="text-sm text-muted-foreground">Visualize e copie todas as escalas do mês, separadas por ambiente e funcionário.</p></div>
+          <Button onClick={handleCopy} className="w-full sm:w-auto shrink-0"><span className="mr-2">{copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}</span>{copied ? "Copiado" : "Copiar tudo"}</Button>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {scheduleList.map((env) => <div key={env.id} className="space-y-3">
+            <div className="rounded-lg bg-muted/60 px-3 py-2 font-semibold">AMBIENTE: {env.name}</div>
+            {env.schedules.map((employee: any) => <div key={employee.id} className="border rounded-lg overflow-hidden">
+              <div className="bg-muted/30 px-3 py-2 font-semibold text-sm">Funcionário: {employee.name}</div>
+              <div className="divide-y">
+                {employee.schedules.map((s: any) => <div key={s.id} className="grid grid-cols-1 sm:grid-cols-[110px_1fr_auto] gap-1 sm:gap-3 px-3 py-2 text-sm"><span className="font-medium">{formatDate(s.date)}</span><span className="text-muted-foreground">{s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)} às ${String(s.end_time).slice(0, 5)}` : "Horário não informado"}</span><span className="font-semibold sm:text-right">{money(Number(s.daily_rate || 0))}</span></div>)}
+              </div>
+            </div>)}
+          </div>)}
+          <textarea readOnly value={copyText} onFocus={(e) => e.currentTarget.select()} className="w-full min-h-56 rounded-lg border bg-muted/20 p-3 text-xs font-mono leading-relaxed resize-y" aria-label="Lista completa das escalas para copiar" />
+        </CardContent>
+      </Card>}
+
       {byEnvironment.length === 0 && <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhuma escala com valor lançada no mês selecionado.</CardContent></Card>}
     </div>
   </div>;
