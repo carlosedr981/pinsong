@@ -4,7 +4,6 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "./Dashboard";
 import { PointRegistrationGuard } from "@/components/PointRegistrationGuard";
-import { WorkScheduleCard } from "@/components/WorkScheduleCard";
 
 export default function Index() {
   const { user, loading } = useAuth();
@@ -20,9 +19,6 @@ export default function Index() {
   return (
     <>
       <Dashboard />
-      <div className="px-4 pb-8 max-w-5xl mx-auto">
-        <WorkScheduleCard isAdmin={false} userId={user.id} />
-      </div>
       <PointRegistrationGuard userId={user.id} />
     </>
   );
