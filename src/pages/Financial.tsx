@@ -37,7 +37,7 @@ export default function Financial() {
       const end = `${nextMonth}-01`;
       const [envResult, scheduleResult, registroResult, profileResult] = await Promise.all([
         db.from("environments").select("id, name").order("name"),
-        db.from("work_schedules").select("id, employee_id, environment_id, date, start_time, end_time, daily_rate, shift_type, notes").gte("date", start).lt("date", end).order("date"),
+        db.from("work_schedules").select("id, employee_id, environment_id, date, start_time, end_time, daily_rate, shift_type, notes, confirmed").gte("date", start).lt("date", end).order("date"),
         db.from("registros").select("user_id, environment_id, timestamp, value_per_registro").gte("timestamp", `${start}T00:00:00`).lt("timestamp", `${end}T00:00:00`),
         db.from("profiles").select("id, full_name").order("full_name"),
       ]);
@@ -54,14 +54,17 @@ export default function Financial() {
     const envSchedules = schedules.filter((s) => s.environment_id === env.id);
     const envRegistros = registros.filter((r) => r.environment_id === env.id);
     const scheduledTotal = envSchedules.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
-    const registeredTotal = envRegistros.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
+    const confirmedScheduleTotal = envSchedules.filter((s) => s.confirmed === true).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const pendingScheduleTotal = envSchedules.filter((s) => s.confirmed !== true).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const registeredRecordsTotal = envRegistros.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
+    const registeredTotal = registeredRecordsTotal + confirmedScheduleTotal;
     const firstTotal = envSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const secondTotal = envSchedules.filter((s) => getDay(s.date) > 15).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const employees = [...new Set(envSchedules.map((s) => s.employee_id))].map((id) => {
       const p = profiles.find((x) => x.id === id); const employeeSchedules = envSchedules.filter((s) => s.employee_id === id);
       return { id, name: p?.full_name || "Funcionário", first: employeeSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((a, s) => a + Number(s.daily_rate || 0), 0), second: employeeSchedules.filter((s) => getDay(s.date) > 15).reduce((a, s) => a + Number(s.daily_rate || 0), 0) };
     });
-    return { ...env, registeredTotal, scheduledTotal, firstTotal, secondTotal, pendingTotal: scheduledTotal, employees };
+    return { ...env, registeredTotal, registeredRecordsTotal, confirmedScheduleTotal, scheduledTotal, firstTotal, secondTotal, pendingTotal: pendingScheduleTotal, employees };
   }), [environments, schedules, registros, profiles]);
 
   const scheduleList = useMemo(() => byEnvironment.map((env) => ({ ...env, schedules: env.employees.map((employee) => ({ ...employee, schedules: schedules.filter((s) => s.environment_id === env.id && s.employee_id === employee.id).sort((a, b) => String(a.date).localeCompare(String(b.date))) })) })), [byEnvironment, schedules]);
@@ -91,7 +94,7 @@ export default function Financial() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return <div className="min-h-screen bg-background">
-    <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados diretamente das escalas lançadas e das diárias informadas.</p></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div>
+    <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados pelas escalas ainda não confirmadas. As escalas confirmadas entram automaticamente no total registrado.</p></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div>
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="grid sm:grid-cols-2 gap-3"><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total registrado</p><p className="text-2xl font-bold">{money(totals.registered)}</p></CardContent></Card><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total pendente das escalas</p><p className="text-2xl font-bold">{money(totals.pending)}</p></CardContent></Card></div>
       {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">1º pagamento — dias 1 a 15</p><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">2º pagamento — dias 16 a fim</p><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
