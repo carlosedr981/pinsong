@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Building2, CalendarRange, Check, Clipboard, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Building2, Check, Clipboard, Loader2, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,7 @@ export default function Financial() {
   const [registros, setRegistros] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copiedEmployee, setCopiedEmployee] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -86,30 +86,28 @@ export default function Financial() {
     })),
   })), [byEnvironment, schedules]);
 
-  const copyText = useMemo(() => {
-    const lines: string[] = [`📋 *ESCALA DE TRABALHO — ${month.split("-")[1]}/${month.split("-")[0]}*`, ""];
-    scheduleList.forEach((env) => {
-      lines.push(`🏢 *AMBIENTE: ${env.name}*`, "");
-      env.schedules.forEach((employee: any) => {
-        lines.push(`👤 *${employee.name}*`);
-        employee.schedules.forEach((s: any) => {
-          const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)} às ${String(s.end_time).slice(0, 5)}` : "Horário não informado";
-          lines.push(`📅 ${formatDate(s.date)}  •  🕐 ${time}  •  💰 ${money(Number(s.daily_rate || 0))}`);
-        });
-        lines.push(`💵 *Total: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}*`, "");
-      });
-      lines.push("");
+  const employeeCopyText = (environmentName: string, employee: any) => {
+    const lines = [
+      `ESCALA DE TRABALHO — ${month.split("-")[1]}/${month.split("-")[0]}`,
+      `Ambiente: ${environmentName}`,
+      `Funcionário: ${employee.name}`,
+      "",
+    ];
+    employee.schedules.forEach((s: any) => {
+      const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)} às ${String(s.end_time).slice(0, 5)}` : "Horário não informado";
+      lines.push(`${formatDate(s.date)} | ${time} | ${money(Number(s.daily_rate || 0))}`);
     });
-    return lines.join("\n").trim();
-  }, [scheduleList, month]);
+    lines.push("", `Total: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}`);
+    return lines.join("\n");
+  };
 
-  const handleCopy = async () => {
-    if (!copyText) return;
+  const handleCopyEmployee = async (environmentName: string, employee: any) => {
+    const key = `${environmentName}-${employee.id}`;
     try {
-      await navigator.clipboard.writeText(copyText);
-      setCopied(true);
-      toast({ title: "Lista copiada", description: "A escala foi formatada para envio no WhatsApp." });
-      window.setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(employeeCopyText(environmentName, employee));
+      setCopiedEmployee(key);
+      toast({ title: "Escala copiada", description: `${employee.name} foi copiado para envio no WhatsApp.` });
+      window.setTimeout(() => setCopiedEmployee(null), 2000);
     } catch {
       toast({ variant: "destructive", title: "Não foi possível copiar", description: "Selecione e copie o texto manualmente." });
     }
@@ -123,12 +121,25 @@ export default function Financial() {
     <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados diretamente das escalas lançadas e das diárias informadas.</p></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div>
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="grid sm:grid-cols-2 gap-3"><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total registrado</p><p className="text-2xl font-bold">{money(totals.registered)}</p></CardContent></Card><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total pendente das escalas</p><p className="text-2xl font-bold">{money(totals.pending)}</p></CardContent></Card></div>
-      {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><div className="flex items-center gap-2 text-sm font-medium"><CalendarRange className="h-4 w-4" />1º pagamento — dias 1 a 15</div><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><div className="flex items-center gap-2 text-sm font-medium"><CalendarRange className="h-4 w-4" />2º pagamento — dias 16 a fim</div><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><Users className="h-4 w-4 text-muted-foreground" /><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
+      {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">1º pagamento — dias 1 a 15</p><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">2º pagamento — dias 16 a fim</p><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><Users className="h-4 w-4 text-muted-foreground" /><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
       {scheduleList.length > 0 && <Card className="border-0 shadow-card">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-3"><div className="flex-1"><CardTitle className="text-base">Lista pronta para WhatsApp</CardTitle><p className="text-sm text-muted-foreground">A cópia usa blocos separados por ambiente e funcionário para não misturar as informações.</p></div><Button onClick={handleCopy} className="w-full sm:w-auto shrink-0"><span className="mr-2">{copied ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}</span>{copied ? "Copiado" : "Copiar para WhatsApp"}</Button></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg border bg-muted/20 p-4 whitespace-pre-wrap text-sm leading-7 max-h-[520px] overflow-y-auto">{copyText}</div>
-          <p className="text-xs text-muted-foreground">O texto acima é exatamente o conteúdo que será copiado. No WhatsApp, os nomes dos ambientes e funcionários ficam destacados e cada escala aparece em uma linha própria.</p>
+        <CardHeader><div><CardTitle className="text-base">Escalas por funcionário</CardTitle><p className="text-sm text-muted-foreground">Cada funcionário possui seu próprio texto pronto para copiar e enviar no WhatsApp.</p></div></CardHeader>
+        <CardContent className="space-y-5">
+          {scheduleList.map((env) => <div key={env.id} className="space-y-3">
+            <div className="border-b pb-2"><h3 className="font-semibold">{env.name}</h3></div>
+            {env.schedules.map((employee: any) => {
+              const key = `${env.name}-${employee.id}`;
+              return <div key={employee.id} className="rounded-lg border p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex-1 min-w-0"><p className="font-semibold break-words">{employee.name}</p><p className="text-xs text-muted-foreground">{employee.schedules.length} escala(s)</p></div>
+                  <Button variant="outline" size="sm" onClick={() => handleCopyEmployee(env.name, employee)} className="w-full sm:w-auto">
+                    {copiedEmployee === key ? <><Check className="h-4 w-4 mr-2" />Copiado</> : <><Clipboard className="h-4 w-4 mr-2" />Copiar</>}
+                  </Button>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap text-sm leading-6 overflow-x-auto">{employeeCopyText(env.name, employee)}</div>
+              </div>;
+            })}
+          </div>)}
         </CardContent>
       </Card>}
       {byEnvironment.length === 0 && <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhuma escala com valor lançada no mês selecionado.</CardContent></Card>}
