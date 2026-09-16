@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import AdminHub from "./pages/AdminHub";
+import Admin from "./pages/Admin";
 import Environments from "./pages/Environments";
 import EmployeeEnvironments from "./pages/EmployeeEnvironments";
 import Financial from "./pages/Financial";
@@ -25,7 +25,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/admin" element={<AdminHub />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="/environments" element={<Environments />} />
             <Route path="/employee-environments" element={<EmployeeEnvironments />} />
             <Route path="/financial" element={<Financial />} />
