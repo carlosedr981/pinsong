@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Building2, Check, Clipboard, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Building2, Check, Clipboard, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,10 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 const db = supabase as any;
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const getDay = (date: string | null | undefined) => Number(String(date || "").slice(8, 10)) || 0;
-const formatDate = (date: string) => {
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year}`;
-};
+const formatDate = (date: string) => { const [, month, day] = date.split("-"); return `${day}/${month}`; };
 
 export default function Financial() {
   const { user } = useAuth();
@@ -26,7 +23,7 @@ export default function Financial() {
   const [registros, setRegistros] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [copiedEmployee, setCopiedEmployee] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -48,69 +45,45 @@ export default function Financial() {
       if (scheduleResult.error) throw scheduleResult.error;
       if (registroResult.error) throw registroResult.error;
       if (profileResult.error) throw profileResult.error;
-      setEnvironments(envResult.data || []);
-      setSchedules(scheduleResult.data || []);
-      setRegistros(registroResult.data || []);
-      setProfiles(profileResult.data || []);
-      setLoading(false);
+      setEnvironments(envResult.data || []); setSchedules(scheduleResult.data || []); setRegistros(registroResult.data || []); setProfiles(profileResult.data || []); setLoading(false);
     };
-    load().catch((error) => {
-      console.error("Erro ao carregar financeiro:", error);
-      toast({ variant: "destructive", title: "Erro financeiro", description: error?.message || "Não foi possível carregar os valores." });
-      setLoading(false);
-    });
+    load().catch((error) => { console.error("Erro ao carregar financeiro:", error); toast({ variant: "destructive", title: "Erro financeiro", description: error?.message || "Não foi possível carregar os valores." }); setLoading(false); });
   }, [user, month, navigate, toast]);
 
-  const byEnvironment = useMemo(() => environments
-    .filter((env) => schedules.some((s) => s.environment_id === env.id && Number(s.daily_rate || 0) > 0))
-    .map((env) => {
-      const envSchedules = schedules.filter((s) => s.environment_id === env.id);
-      const envRegistros = registros.filter((r) => r.environment_id === env.id);
-      const scheduledTotal = envSchedules.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
-      const registeredTotal = envRegistros.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
-      const firstTotal = envSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
-      const secondTotal = envSchedules.filter((s) => getDay(s.date) > 15).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
-      const employees = [...new Set(envSchedules.map((s) => s.employee_id))].map((id) => {
-        const p = profiles.find((x) => x.id === id);
-        const employeeSchedules = envSchedules.filter((s) => s.employee_id === id);
-        return { id, name: p?.full_name || "Funcionário", first: employeeSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((a, s) => a + Number(s.daily_rate || 0), 0), second: employeeSchedules.filter((s) => getDay(s.date) > 15).reduce((a, s) => a + Number(s.daily_rate || 0), 0) };
-      });
-      return { ...env, registeredTotal, scheduledTotal, firstTotal, secondTotal, pendingTotal: scheduledTotal, employees };
-    }), [environments, schedules, registros, profiles]);
-
-  const scheduleList = useMemo(() => byEnvironment.map((env) => ({
-    ...env,
-    schedules: env.employees.map((employee) => ({
-      ...employee,
-      schedules: schedules.filter((s) => s.environment_id === env.id && s.employee_id === employee.id).sort((a, b) => String(a.date).localeCompare(String(b.date))),
-    })),
-  })), [byEnvironment, schedules]);
-
-  const employeeCopyText = (environmentName: string, employee: any) => {
-    const lines = [
-      `ESCALA DE TRABALHO — ${month.split("-")[1]}/${month.split("-")[0]}`,
-      `Ambiente: ${environmentName}`,
-      `Funcionário: ${employee.name}`,
-      "",
-    ];
-    employee.schedules.forEach((s: any) => {
-      const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)} às ${String(s.end_time).slice(0, 5)}` : "Horário não informado";
-      lines.push(`${formatDate(s.date)} | ${time} | ${money(Number(s.daily_rate || 0))}`);
+  const byEnvironment = useMemo(() => environments.filter((env) => schedules.some((s) => s.environment_id === env.id && Number(s.daily_rate || 0) > 0)).map((env) => {
+    const envSchedules = schedules.filter((s) => s.environment_id === env.id);
+    const envRegistros = registros.filter((r) => r.environment_id === env.id);
+    const scheduledTotal = envSchedules.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const registeredTotal = envRegistros.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
+    const firstTotal = envSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const secondTotal = envSchedules.filter((s) => getDay(s.date) > 15).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const employees = [...new Set(envSchedules.map((s) => s.employee_id))].map((id) => {
+      const p = profiles.find((x) => x.id === id); const employeeSchedules = envSchedules.filter((s) => s.employee_id === id);
+      return { id, name: p?.full_name || "Funcionário", first: employeeSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((a, s) => a + Number(s.daily_rate || 0), 0), second: employeeSchedules.filter((s) => getDay(s.date) > 15).reduce((a, s) => a + Number(s.daily_rate || 0), 0) };
     });
-    lines.push("", `Total: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}`);
-    return lines.join("\n");
-  };
+    return { ...env, registeredTotal, scheduledTotal, firstTotal, secondTotal, pendingTotal: scheduledTotal, employees };
+  }), [environments, schedules, registros, profiles]);
 
-  const handleCopyEmployee = async (environmentName: string, employee: any) => {
-    const key = `${environmentName}-${employee.id}`;
+  const scheduleList = useMemo(() => byEnvironment.map((env) => ({ ...env, schedules: env.employees.map((employee) => ({ ...employee, schedules: schedules.filter((s) => s.environment_id === env.id && s.employee_id === employee.id).sort((a, b) => String(a.date).localeCompare(String(b.date))) })) })), [byEnvironment, schedules]);
+
+  const copyEmployee = async (env: any, employee: any) => {
+    const lines = [
+      `*${employee.name}*`,
+      `*${env.name}*`,
+      "",
+      ...employee.schedules.map((s: any) => {
+        const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)}-${String(s.end_time).slice(0, 5)}` : "--";
+        return `*${formatDate(s.date)}* ${time} ${money(Number(s.daily_rate || 0))}`;
+      }),
+      "",
+      `*Total: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}*`,
+    ];
     try {
-      await navigator.clipboard.writeText(employeeCopyText(environmentName, employee));
-      setCopiedEmployee(key);
-      toast({ title: "Escala copiada", description: `${employee.name} foi copiado para envio no WhatsApp.` });
-      window.setTimeout(() => setCopiedEmployee(null), 2000);
-    } catch {
-      toast({ variant: "destructive", title: "Não foi possível copiar", description: "Selecione e copie o texto manualmente." });
-    }
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopiedId(`${env.id}-${employee.id}`);
+      toast({ title: "Copiado", description: `Escala de ${employee.name} pronta para o WhatsApp.` });
+      window.setTimeout(() => setCopiedId(null), 2000);
+    } catch { toast({ variant: "destructive", title: "Não foi possível copiar", description: "Selecione e copie o texto manualmente." }); }
   };
 
   const totals = byEnvironment.reduce((a, e) => ({ registered: a.registered + e.registeredTotal, pending: a.pending + e.pendingTotal }), { registered: 0, pending: 0 });
@@ -121,27 +94,8 @@ export default function Financial() {
     <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados diretamente das escalas lançadas e das diárias informadas.</p></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div>
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="grid sm:grid-cols-2 gap-3"><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total registrado</p><p className="text-2xl font-bold">{money(totals.registered)}</p></CardContent></Card><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total pendente das escalas</p><p className="text-2xl font-bold">{money(totals.pending)}</p></CardContent></Card></div>
-      {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">1º pagamento — dias 1 a 15</p><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">2º pagamento — dias 16 a fim</p><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><Users className="h-4 w-4 text-muted-foreground" /><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
-      {scheduleList.length > 0 && <Card className="border-0 shadow-card">
-        <CardHeader><div><CardTitle className="text-base">Escalas por funcionário</CardTitle><p className="text-sm text-muted-foreground">Cada funcionário possui seu próprio texto pronto para copiar e enviar no WhatsApp.</p></div></CardHeader>
-        <CardContent className="space-y-5">
-          {scheduleList.map((env) => <div key={env.id} className="space-y-3">
-            <div className="border-b pb-2"><h3 className="font-semibold">{env.name}</h3></div>
-            {env.schedules.map((employee: any) => {
-              const key = `${env.name}-${employee.id}`;
-              return <div key={employee.id} className="rounded-lg border p-4 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                  <div className="flex-1 min-w-0"><p className="font-semibold break-words">{employee.name}</p><p className="text-xs text-muted-foreground">{employee.schedules.length} escala(s)</p></div>
-                  <Button variant="outline" size="sm" onClick={() => handleCopyEmployee(env.name, employee)} className="w-full sm:w-auto">
-                    {copiedEmployee === key ? <><Check className="h-4 w-4 mr-2" />Copiado</> : <><Clipboard className="h-4 w-4 mr-2" />Copiar</>}
-                  </Button>
-                </div>
-                <div className="rounded-md border bg-muted/20 p-3 whitespace-pre-wrap text-sm leading-6 overflow-x-auto">{employeeCopyText(env.name, employee)}</div>
-              </div>;
-            })}
-          </div>)}
-        </CardContent>
-      </Card>}
+      {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">1º pagamento — dias 1 a 15</p><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">2º pagamento — dias 16 a fim</p><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
+      {scheduleList.length > 0 && <Card className="border-0 shadow-card"><CardHeader><div><CardTitle className="text-base">Escalas para WhatsApp</CardTitle><p className="text-sm text-muted-foreground">Cada funcionário tem uma cópia própria, compacta e organizada.</p></div></CardHeader><CardContent className="space-y-4">{scheduleList.map((env) => <div key={env.id} className="space-y-2"><p className="text-sm font-semibold border-b pb-1">{env.name}</p>{env.schedules.map((employee: any) => { const copyId = `${env.id}-${employee.id}`; return <div key={employee.id} className="rounded-lg border p-3 space-y-2"><div className="flex items-center gap-2"><div className="flex-1 min-w-0"><p className="font-semibold truncate">{employee.name}</p><p className="text-xs text-muted-foreground">{employee.schedules.length} registro(s) · {money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}</p></div><Button size="sm" variant="outline" onClick={() => copyEmployee(env, employee)}>{copiedId === copyId ? <><Check className="h-4 w-4 mr-1" />Copiado</> : <><Clipboard className="h-4 w-4 mr-1" />Copiar</>}</Button></div><div className="rounded-md bg-muted/30 px-3 py-2 whitespace-pre-wrap text-sm leading-6">{employee.schedules.map((s: any) => <div key={s.id}><strong>{formatDate(s.date)}</strong> {s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)}-${String(s.end_time).slice(0, 5)}` : "--"} {money(Number(s.daily_rate || 0))}</div>)}<div className="mt-1 pt-1 border-t font-semibold">Total: {money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}</div></div></div>; })}</div>)}</CardContent></Card>}
       {byEnvironment.length === 0 && <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhuma escala com valor lançada no mês selecionado.</CardContent></Card>}
     </div>
   </div>;
