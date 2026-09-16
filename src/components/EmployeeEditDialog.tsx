@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { EmployeeEnvironmentAssignment } from "@/components/EmployeeEnvironmentAssignment";
 
 const employeeSchema = z.object({
   full_name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
@@ -296,6 +297,9 @@ export function EmployeeEditDialog({
                 />
               </div>
             </div>
+
+            <EmployeeEnvironmentAssignment employeeId={employee.id} />
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
