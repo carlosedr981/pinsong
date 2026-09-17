@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock, LogOut, Camera, Loader2, Shield, MessageSquare, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import { RegistrosHierarchy } from "@/components/RegistrosHierarchy";
 import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
 import { MonthlyReportDialog } from "@/components/MonthlyReportDialog";
 import { TicketDialog } from "@/components/TicketDialog";
-import { EmployeeOfDayCard } from "@/components/EmployeeOfDayCard";
 import { WorkScheduleCard } from "@/components/WorkScheduleCard";
 import { useTicketNotifications } from "@/hooks/useTicketNotifications";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
@@ -92,7 +91,6 @@ export default function Dashboard() {
         <Card className="overflow-hidden border-0 shadow-xl"><CardContent className="p-4 sm:p-6"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Status de Hoje</p><p className="text-base font-semibold sm:text-lg">{todayRegistros.length} registro{todayRegistros.length !== 1 ? "s" : ""}</p></div>{lastRegistro && <div className="shrink-0 text-right"><p className="text-sm text-muted-foreground">Último Registro</p><p className="text-base font-semibold sm:text-lg">{format(new Date(lastRegistro.timestamp), "HH:mm")}</p></div>}</div><Button onClick={() => setShowCamera(true)} className="h-14 w-full text-base font-semibold gradient-primary shadow-glow sm:text-lg" size="lg"><Camera className="mr-2 h-6 w-6" />Registrar Ponto</Button></CardContent></Card>
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
         <RegistrosHierarchy registros={registros} onPhotoClick={setSelectedPhoto} />
-        {isAdmin && user && <EmployeeOfDayCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
       </div>
     </div>
   );
