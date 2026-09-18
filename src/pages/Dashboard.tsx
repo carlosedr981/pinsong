@@ -142,6 +142,8 @@ export default function Dashboard() {
       setScheduleStats({ total: rows.length, confirmed: rows.filter((s: any) => s.confirmed === true).length, pending: rows.filter((s: any) => s.confirmed !== true).length, value: rows.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0) });
     };
     loadScheduleStats();
+    const timer = window.setInterval(loadScheduleStats, 30000);
+    return () => window.clearInterval(timer);
   }, [user, isAdmin]);
 
   const handleCapture = async (imageDataUrl: string) => {
