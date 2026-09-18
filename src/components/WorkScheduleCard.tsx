@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Calendar, Clock, Plus, Pencil, Trash2, Users, ChevronLeft, ChevronRight, Building2, Check, ChevronDown, Copy, History, Save, AlertTriangle } from "lucide-react";
+import { Calendar, Clock, Plus, Pencil, Trash2, Users, ChevronLeft, ChevronRight, Building2, Check, ChevronDown, Copy, History, Save } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
