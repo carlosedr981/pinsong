@@ -55,7 +55,7 @@ export default function Financial() {
 
   const byEnvironment = useMemo(() => environments.filter((env) => visibleSchedules.some((s) => s.environment_id === env.id && Number(s.daily_rate || 0) > 0)).map((env) => {
     const envSchedules = visibleSchedules.filter((s) => s.environment_id === env.id);
-    const envRegistros = registros.filter((r) => r.environment_id === env.id);
+    const envRegistros = registros.filter((r) => r.environment_id === env.id && (selectedEmployee === "all" || r.user_id === selectedEmployee));
     const scheduledTotal = envSchedules.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const confirmedScheduleTotal = envSchedules.filter((s) => s.confirmed === true).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const pendingScheduleTotal = envSchedules.filter((s) => s.confirmed !== true).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
@@ -68,7 +68,7 @@ export default function Financial() {
       return { id, name: p?.full_name || "Funcionário", first: employeeSchedules.filter((s) => getDay(s.date) <= 15 && getDay(s.date) > 0).reduce((a, s) => a + Number(s.daily_rate || 0), 0), second: employeeSchedules.filter((s) => getDay(s.date) > 15).reduce((a, s) => a + Number(s.daily_rate || 0), 0) };
     });
     return { ...env, registeredTotal, registeredRecordsTotal, confirmedScheduleTotal, scheduledTotal, firstTotal, secondTotal, pendingTotal: pendingScheduleTotal, employees };
-  }), [environments, visibleSchedules, registros, profiles]);
+  }), [environments, visibleSchedules, registros, profiles, selectedEmployee]);
 
   const scheduleList = useMemo(() => byEnvironment.map((env) => ({ ...env, schedules: env.employees.map((employee) => ({ ...employee, schedules: visibleSchedules.filter((s) => s.environment_id === env.id && s.employee_id === employee.id).sort((a, b) => String(a.date).localeCompare(String(b.date))) })) })), [byEnvironment, visibleSchedules]);
 
