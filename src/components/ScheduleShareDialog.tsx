@@ -22,6 +22,8 @@ interface ShareSchedule {
   employee_name: string;
   environment_name: string;
   shift_type: string;
+  start_time: string | null;
+  end_time: string | null;
 }
 
 const periodLabel = (value: string) => ({
@@ -57,7 +59,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
       }
       let query = db
         .from("work_schedules")
-        .select("employee_id, environment_id, date, shift_type")
+        .select("employee_id, environment_id, date, shift_type, start_time, end_time")
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date")
@@ -94,6 +96,8 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
         employee_name: profileMap.get(item.employee_id) || "Funcionário",
         environment_name: environmentMap.get(item.environment_id) || "Sem ambiente",
         shift_type: item.shift_type || "regular",
+        start_time: item.start_time || null,
+        end_time: item.end_time || null,
       })));
     } catch (error: any) {
       toast({
@@ -124,7 +128,12 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
   const text = Object.entries(grouped)
     .map(([date, items]) => {
       const dateLabel = format(new Date(date + "T12:00:00"), "EEEE, dd/MM", { locale: ptBR });
-      const lines = items.map((item) => "• " + item.employee_name + " — " + periodLabel(item.shift_type) + " — " + item.environment_name);
+      const lines = items.map((item) => {
+        const time = item.start_time && item.end_time
+          ? item.start_time.slice(0, 5) + " às " + item.end_time.slice(0, 5)
+          : "Horário não informado";
+        return "• " + item.employee_name + " — " + time + " — " + periodLabel(item.shift_type) + " — " + item.environment_name;
+      });
       return "*" + dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1) + "*\n" + lines.join("\n");
     })
     .join("\n\n");
