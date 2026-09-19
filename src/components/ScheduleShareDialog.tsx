@@ -5,6 +5,7 @@ import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,8 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
   const defaultEnd = format(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 6), "yyyy-MM-dd");
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(defaultEnd);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("all");
+  const [employees, setEmployees] = useState<{ id: string; full_name: string }[]>([]);
   const { toast } = useToast();
 
   const loadSchedules = async () => {
@@ -64,6 +67,10 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
         .lte("date", endDate)
         .order("date")
         .order("start_time");
+
+      if (selectedEmployeeId !== "all") {
+        query = query.eq("employee_id", selectedEmployeeId);
+      }
 
       if (!isGlobalAdmin && environmentId) {
         query = query.eq("environment_id", environmentId);
@@ -111,11 +118,23 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
   };
 
   useEffect(() => {
+    if (!open || !isAdmin) return;
+    const loadEmployees = async () => {
+      const { data, error } = await db
+        .from("profiles")
+        .select("id,full_name")
+        .order("full_name");
+      if (!error) setEmployees(data || []);
+    };
+    loadEmployees();
+  }, [open, isAdmin]);
+
+  useEffect(() => {
     if (open && isAdmin) {
       loadSchedules();
       setCopied(false);
     }
-  }, [open, isAdmin, isGlobalAdmin, environmentId, startDate, endDate]);
+  }, [open, isAdmin, isGlobalAdmin, environmentId, startDate, endDate, selectedEmployeeId]);
 
   if (!isAdmin) return null;
 
@@ -169,6 +188,20 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
           </DialogTitle>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="share-employee">Funcionário</Label>
+            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <SelectTrigger id="share-employee">
+                <SelectValue placeholder="Todos os funcionários" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os funcionários</SelectItem>
+                {employees.map((employee) => (
+                  <SelectItem key={employee.id} value={employee.id}>{employee.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="share-start-date">Data inicial</Label>
