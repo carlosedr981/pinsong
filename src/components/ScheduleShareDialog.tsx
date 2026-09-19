@@ -3,6 +3,8 @@ import { CalendarDays, Copy, Check, MessageSquare } from "lucide-react";
 import { addDays, format, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,18 +36,30 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
   const [loading, setLoading] = useState(false);
   const [schedules, setSchedules] = useState<ShareSchedule[]>([]);
   const [copied, setCopied] = useState(false);
+  const defaultStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const defaultEnd = format(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 6), "yyyy-MM-dd");
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
   const { toast } = useToast();
 
   const loadSchedules = async () => {
     setLoading(true);
     try {
-      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-      const weekEnd = addDays(weekStart, 6);
+      if (!startDate || !endDate) {
+        toast({ variant: "destructive", title: "Período obrigatório", description: "Selecione a data inicial e a data final." });
+        setLoading(false);
+        return;
+      }
+      if (startDate > endDate) {
+        toast({ variant: "destructive", title: "Período inválido", description: "A data final deve ser igual ou posterior à data inicial." });
+        setLoading(false);
+        return;
+      }
       let query = db
         .from("work_schedules")
         .select("employee_id, environment_id, date, shift_type")
-        .gte("date", format(weekStart, "yyyy-MM-dd"))
-        .lte("date", format(weekEnd, "yyyy-MM-dd"))
+        .gte("date", startDate)
+        .lte("date", endDate)
         .order("date")
         .order("shift_type");
 
@@ -85,7 +99,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
       toast({
         variant: "destructive",
         title: "Erro ao gerar escala",
-        description: error.message || "Não foi possível carregar as escalas da semana.",
+        description: error.message || "Não foi possível carregar as escalas do período selecionado.",
       });
     } finally {
       setLoading(false);
@@ -97,7 +111,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
       loadSchedules();
       setCopied(false);
     }
-  }, [open, isAdmin, isGlobalAdmin, environmentId]);
+  }, [open, isAdmin, isGlobalAdmin, environmentId, startDate, endDate]);
 
   if (!isAdmin) return null;
 
@@ -145,7 +159,17 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
             Escala para o grupo
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="share-start-date">Data inicial</Label>
+              <Input id="share-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="share-end-date">Data final</Label>
+              <Input id="share-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min={startDate || undefined} />
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground">
             Texto pronto para copiar e enviar no grupo dos funcionários.
           </p>
