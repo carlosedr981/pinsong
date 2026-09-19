@@ -130,8 +130,8 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
     .join("\n\n");
 
   const message = text
-    ? "*ESCALA DA SEMANA*\n\n" + text
-    : "*ESCALA DA SEMANA*\n\nNenhuma escala cadastrada para esta semana.";
+    ? "*ESCALA*\n\n" + text
+    : "*ESCALA*\n\nNenhuma escala cadastrada no período selecionado.";
 
   const copyMessage = async () => {
     try {
