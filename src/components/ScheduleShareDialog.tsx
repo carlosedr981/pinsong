@@ -63,7 +63,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date")
-        .order("shift_type");
+        .order("start_time");
 
       if (!isGlobalAdmin && environmentId) {
         query = query.eq("environment_id", environmentId);
@@ -132,7 +132,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
         const time = item.start_time && item.end_time
           ? item.start_time.slice(0, 5) + " às " + item.end_time.slice(0, 5)
           : "Horário não informado";
-        return "• " + item.employee_name + " — " + time + " — " + periodLabel(item.shift_type) + " — " + item.environment_name;
+        return "• *" + item.employee_name + "*\\n  " + time + " | " + periodLabel(item.shift_type) + " | " + item.environment_name;
       });
       return "*" + dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1) + "*\n" + lines.join("\n");
     })
