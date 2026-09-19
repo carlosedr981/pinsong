@@ -13,6 +13,7 @@ import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import { RegistrosHierarchy } from "@/components/RegistrosHierarchy";
 import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
 import { WorkScheduleCard } from "@/components/WorkScheduleCard";
+import { ScheduleShareDialog } from "@/components/ScheduleShareDialog";
 import { useTicketNotifications } from "@/hooks/useTicketNotifications";
 import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
 import { reverseGeocode } from "@/lib/geocoding";
@@ -217,6 +218,7 @@ export default function Dashboard() {
 <Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Resumo das escalas de hoje</p><p className="text-xs text-muted-foreground">Acompanhe rapidamente o que está confirmado.</p></div><Users className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Escalas</p><p className="text-xl font-bold">{scheduleStats.total}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmadas</p><p className="text-xl font-bold">{scheduleStats.confirmed}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendentes</p><p className="text-xl font-bold">{scheduleStats.pending}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor previsto</p><p className="text-base font-bold">{scheduleStats.value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card>
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
         <RegistrosHierarchy registros={registros} onPhotoClick={setSelectedPhoto} />
+        <ScheduleShareDialog isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} environmentId={userEnvironmentId} />
       </div>
     </div>
   );
