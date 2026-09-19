@@ -161,14 +161,14 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
           Gerar escala para enviar no grupo
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-hidden">
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-primary" />
             Escala para o grupo
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="share-start-date">Data inicial</Label>
@@ -182,14 +182,14 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
           <p className="text-sm text-muted-foreground">
             Texto pronto para copiar e enviar no grupo dos funcionários.
           </p>
-          <div className="max-h-[50vh] overflow-y-auto rounded-xl border bg-muted/30 p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border bg-muted/30 p-4">
             {loading ? (
               <p className="py-8 text-center text-sm text-muted-foreground">Gerando escala...</p>
             ) : (
               <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-6">{message}</pre>
             )}
           </div>
-          <Button onClick={copyMessage} disabled={loading} className="h-12 w-full">
+          <Button onClick={copyMessage} disabled={loading} className="h-12 w-full shrink-0">
             {copied ? <Check className="mr-2 h-5 w-5" /> : <Copy className="mr-2 h-5 w-5" />}
             {copied ? "Copiado!" : "Copiar escala"}
           </Button>
