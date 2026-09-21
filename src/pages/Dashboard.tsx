@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Camera, Shield, MessageSquare, Users } from "lucide-react";
+import { Clock, LogOut, Camera, Shield, MessageSquare, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ export default function Dashboard() {
   const [hourlyRate, setHourlyRate] = useState<number>(20);
   const [userEnvironmentId, setUserEnvironmentId] = useState<string | null>(null);
   const [scheduleStats, setScheduleStats] = useState({ total: 0, confirmed: 0, pending: 0, value: 0 });
+  const [personalFinancial, setPersonalFinancial] = useState({ receivable: 0, pending: 0 });
   const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -147,6 +148,33 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, [user, isAdmin]);
 
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    const loadPersonalFinancial = async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+      const nextMonthDate = new Date(year, month + 1, 1);
+      const end = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
+      const { data, error } = await supabase
+        .from("work_schedules")
+        .select("daily_rate, confirmed")
+        .eq("employee_id", user.id)
+        .gte("date", start)
+        .lt("date", end);
+      if (error) return;
+      const rows = data || [];
+      setPersonalFinancial({
+        receivable: rows.filter((s: any) => s.confirmed === true).reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0),
+        pending: rows.filter((s: any) => s.confirmed !== true).reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0),
+      });
+    };
+    loadPersonalFinancial();
+    const timer = window.setInterval(loadPersonalFinancial, 30000);
+    return () => window.clearInterval(timer);
+  }, [user, isAdmin]);
+
   const handleCapture = async (imageDataUrl: string) => {
     if (!user || !profile) return;
     setProcessing(true);
@@ -215,7 +243,7 @@ export default function Dashboard() {
       </div>
       <div className="mx-auto -mt-12 max-w-3xl space-y-4 px-3 pb-8 sm:space-y-6 sm:px-4">
         <Card className="overflow-hidden border-0 shadow-xl"><CardContent className="p-4 sm:p-6"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Status de Hoje</p><p className="text-base font-semibold sm:text-lg">{todayRegistros.length} registro{todayRegistros.length !== 1 ? "s" : ""}</p></div>{lastRegistro && <div className="shrink-0 text-right"><p className="text-sm text-muted-foreground">Último Registro</p><p className="text-base font-semibold sm:text-lg">{format(new Date(lastRegistro.timestamp), "HH:mm")}</p></div>}</div><Button onClick={() => setShowCamera(true)} className="h-14 w-full text-base font-semibold gradient-primary shadow-glow sm:text-lg" size="lg"><Camera className="mr-2 h-6 w-6" />Registrar Ponto</Button></CardContent></Card>
-<Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Resumo das escalas de hoje</p><p className="text-xs text-muted-foreground">Acompanhe rapidamente o que está confirmado.</p></div><Users className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Escalas</p><p className="text-xl font-bold">{scheduleStats.total}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmadas</p><p className="text-xl font-bold">{scheduleStats.confirmed}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendentes</p><p className="text-xl font-bold">{scheduleStats.pending}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor previsto</p><p className="text-base font-bold">{scheduleStats.value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card>
+<Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Resumo das escalas de hoje</p><p className="text-xs text-muted-foreground">Acompanhe rapidamente o que está confirmado.</p></div><Users className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Escalas</p><p className="text-xl font-bold">{scheduleStats.total}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmadas</p><p className="text-xl font-bold">{scheduleStats.confirmed}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendentes</p><p className="text-xl font-bold">{scheduleStats.pending}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor previsto</p><p className="text-base font-bold">{scheduleStats.value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card><Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Meu financeiro</p><p className="text-xs text-muted-foreground">Valores conforme as escalas programadas deste mês.</p></div><Wallet className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">A receber</p><p className="text-xl font-bold">{personalFinancial.receivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendente</p><p className="text-xl font-bold">{personalFinancial.pending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card>
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
         <RegistrosHierarchy registros={registros} onPhotoClick={setSelectedPhoto} />
         <ScheduleShareDialog isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} environmentId={userEnvironmentId} />
