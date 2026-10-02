@@ -80,7 +80,7 @@ export default function Financial() {
       ...employee.schedules.map((s: any) => {
         const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)}-${String(s.end_time).slice(0, 5)}` : "--";
         const confirmation = s.confirmed === true ? " 🟢" : "";
-        return `*${formatDate(s.date)}*${confirmation} ${time} ${money(Number(s.daily_rate || 0))}`;
+        return `${confirmation ? "🟢 " : ""}*${formatDate(s.date)}* ${time} ${money(Number(s.daily_rate || 0))}`;
       }),
       "",
       `*Total: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}*`,
