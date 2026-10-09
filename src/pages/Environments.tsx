@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Building2, ArrowLeft, Pencil, Trash2, Users, Loader2, Search, ChevronDown, Shield, UserPlus, X } from "lucide-react";
+import { Plus, Building2, ArrowLeft, Pencil, Trash2, Users, Loader2, Search, ChevronDown, Shield, UserPlus, X, Wallet, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { format, endOfMonth } from "date-fns";
 
-interface Environment { id: string; name: string; slug: string; created_at: string; employeeCount?: number; admins?: EnvironmentAdmin[]; isOpen?: boolean; }
+interface Environment { id: string; name: string; slug: string; created_at: string; fortnightly_revenue?: number | null; employeeCount?: number; admins?: EnvironmentAdmin[]; isOpen?: boolean; }
 interface Employee { id: string; full_name: string; email: string | null; phone: string | null; cpf: string | null; avatar_url: string | null; environment_id: string | null; environment_ids: string[]; }
 interface EnvironmentAdmin { id: string; user_id: string; environment_id: string; profile: { id: string; full_name: string; email: string | null; avatar_url: string | null; }; }
 
@@ -30,6 +31,9 @@ export default function Environments() {
   const [deletingEnv, setDeletingEnv] = useState<Environment | null>(null);
   const [envName, setEnvName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fortnightRevenue, setFortnightRevenue] = useState<Record<string, string>>({});
+  const [fortnightCosts, setFortnightCosts] = useState<Record<string, number>>({});
+  const [savingFinanceEnv, setSavingFinanceEnv] = useState<string | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedEnvId, setSelectedEnvId] = useState("");
@@ -54,6 +58,14 @@ export default function Environments() {
     try {
       const { data: envData, error: envError } = await supabase.from("environments").select("*").order("name");
       if (envError) throw envError;
+      const today = new Date();
+      const periodStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() <= 15 ? 1 : 16);
+      const periodEnd = today.getDate() <= 15 ? new Date(today.getFullYear(), today.getMonth(), 15) : endOfMonth(today);
+      const { data: scheduleRows, error: scheduleError } = await supabase.from("work_schedules").select("environment_id,daily_rate,date").gte("date", format(periodStart, "yyyy-MM-dd")).lte("date", format(periodEnd, "yyyy-MM-dd"));
+      if (scheduleError) throw scheduleError;
+      const costMap: Record<string, number> = {};
+      (scheduleRows || []).forEach((row: any) => { if (row.environment_id) costMap[row.environment_id] = (costMap[row.environment_id] || 0) + Number(row.daily_rate || 0); });
+      setFortnightCosts(costMap);
       const { data: empData, error: empError } = await supabase.from("profiles").select("id, full_name, email, phone, cpf, avatar_url, environment_id").order("full_name");
       if (empError) throw empError;
       const { data: assignments, error: assignmentsError } = await supabase.from("employee_environments").select("user_id, environment_id");
@@ -89,6 +101,7 @@ export default function Environments() {
         return { ...env, employeeCount: employeesWithAssignments.filter(e => e.environment_ids.includes(env.id)).length, admins, isOpen: false };
       });
 
+      setFortnightRevenue(Object.fromEntries((envData || []).map((env: any) => [env.id, String(env.fortnightly_revenue ?? "")])));
       setEnvironments(envsWithCounts);
       setEmployees(employeesWithAssignments);
     } catch (error) {
@@ -98,6 +111,22 @@ export default function Environments() {
   };
 
   const generateSlug = (name: string) => name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+  const handleSaveEnvironmentFinance = async (env: Environment) => {
+    const raw = (fortnightRevenue[env.id] || "").trim().replace(",", ".");
+    const amount = raw === "" ? 0 : Number(raw);
+    if (!Number.isFinite(amount) || amount < 0) { toast({ variant: "destructive", title: "Valor inválido", description: "Informe um valor válido e não negativo." }); return; }
+    setSavingFinanceEnv(env.id);
+    try {
+      const { error } = await supabase.from("environments").update({ fortnightly_revenue: amount } as any).eq("id", env.id);
+      if (error) throw error;
+      setEnvironments(current => current.map(item => item.id === env.id ? { ...item, fortnightly_revenue: amount } : item));
+      toast({ title: "Financeiro do ambiente salvo", description: `O valor da quinzena de ${env.name} foi atualizado.` });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erro ao salvar financeiro", description: error.message || "Confira se a atualização SQL foi executada no Supabase." });
+    } finally { setSavingFinanceEnv(null); }
+  };
+  const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const handleSaveEnvironment = async () => {
     if (!envName.trim()) { toast({ variant: "destructive", title: "Nome obrigatório", description: "Digite um nome para o ambiente." }); return; }
@@ -221,6 +250,7 @@ export default function Environments() {
         {getUnassignedEmployees().length > 0 && <Card className="border-0 shadow-md overflow-hidden border-l-4 border-l-warning"><Collapsible><CollapsibleTrigger asChild><CardHeader className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-warning/20 flex items-center justify-center"><Users className="h-5 w-5 text-warning" /></div><div className="flex-1"><CardTitle className="text-base">Sem Ambiente</CardTitle><p className="text-sm text-muted-foreground">Funcionários não vinculados</p></div><span className="text-sm font-medium text-warning">{getUnassignedEmployees().length} funcionário{getUnassignedEmployees().length !== 1 ? "s" : ""}</span><ChevronDown className="h-5 w-5 text-muted-foreground" /></div></CardHeader></CollapsibleTrigger><CollapsibleContent><CardContent className="p-4 pt-0 border-t"><div className="space-y-2">{getUnassignedEmployees().map(emp => { const initials = emp.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase(); return <div key={emp.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => { setSelectedEmployee(emp); setSelectedEnvId(""); setAssignDialogOpen(true); }}><Avatar className="h-8 w-8"><AvatarImage src={emp.avatar_url || undefined} /><AvatarFallback className="text-xs">{initials}</AvatarFallback></Avatar><div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{emp.full_name}</p><p className="text-xs text-muted-foreground truncate">{emp.email}</p></div><Button variant="ghost" size="sm">Vincular</Button></div>; })}</div></CardContent></CollapsibleContent></Collapsible></Card>}
 
         {filteredEnvironments.length === 0 ? <Card className="border-0 shadow-md"><CardContent className="py-12 text-center"><Building2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" /><p className="text-muted-foreground">Nenhum ambiente encontrado</p><p className="text-sm text-muted-foreground/70">Clique em "Novo" para criar um ambiente</p></CardContent></Card> : filteredEnvironments.map(env => <Card key={env.id} className="border-0 shadow-md overflow-hidden"><Collapsible open={env.isOpen} onOpenChange={() => toggleEnvironment(env.id)}><CollapsibleTrigger asChild><CardHeader className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1 min-w-0"><div className="flex items-center gap-2"><CardTitle className="text-base truncate">{env.name}</CardTitle><Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={e => { e.stopPropagation(); setEditingEnv(env); setEnvName(env.name); setDialogOpen(true); }}><Pencil className="h-3 w-3" /></Button><Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={e => { e.stopPropagation(); setDeletingEnv(env); setDeleteDialogOpen(true); }}><Trash2 className="h-3 w-3" /></Button></div><p className="text-sm text-muted-foreground">Código: <span className="font-mono">{env.slug}</span></p></div><div className="flex items-center gap-2"><span className="text-sm font-medium text-primary">{env.employeeCount} funcionário{env.employeeCount !== 1 ? "s" : ""}</span><ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", env.isOpen && "rotate-180")} /></div></div></CardHeader></CollapsibleTrigger><CollapsibleContent><CardContent className="p-4 pt-0 border-t space-y-4">
+          <div className="rounded-xl border bg-background p-3 space-y-3"><div className="flex items-center gap-2"><Wallet className="h-4 w-4 text-primary" /><p className="text-sm font-semibold">Financeiro da quinzena</p></div><div className="space-y-1"><Label htmlFor={`revenue-${env.id}`}>Quanto você recebe neste ambiente por quinzena (R$)</Label><div className="flex gap-2"><Input id={`revenue-${env.id}`} type="number" min="0" step="0.01" inputMode="decimal" placeholder="Ex.: 15000,00" value={fortnightRevenue[env.id] ?? String(env.fortnightly_revenue ?? "")} onChange={e => setFortnightRevenue(current => ({ ...current, [env.id]: e.target.value }))} /><Button size="icon" aria-label="Salvar valor da quinzena" disabled={savingFinanceEnv === env.id} onClick={() => handleSaveEnvironmentFinance(env)}>{savingFinanceEnv === env.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}</Button></div></div><div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2"><div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">Recebimento previsto</p><p className="text-base font-bold">{money(Number(fortnightRevenue[env.id] ?? env.fortnightly_revenue ?? 0))}</p></div><div className="rounded-lg bg-muted/60 p-3"><p className="text-xs text-muted-foreground">A pagar aos funcionários</p><p className="text-base font-bold">{money(fortnightCosts[env.id] || 0)}</p></div><div className="rounded-lg bg-primary/10 p-3"><p className="text-xs text-muted-foreground">Saldo livre estimado</p><p className={`text-base font-bold ${(Number(fortnightRevenue[env.id] ?? env.fortnightly_revenue ?? 0) - (fortnightCosts[env.id] || 0)) < 0 ? "text-destructive" : "text-primary"}`}>{money(Number(fortnightRevenue[env.id] ?? env.fortnightly_revenue ?? 0) - (fortnightCosts[env.id] || 0))}</p></div></div><p className="text-xs text-muted-foreground">Cálculo da quinzena atual ({format(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() <= 15 ? 1 : 16), "dd/MM")} a {format(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() <= 15 ? 15 : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()), "dd/MM")}). O custo soma as diárias cadastradas nas escalas deste ambiente no período.</p></div>
           <div className="bg-muted/50 rounded-lg p-3"><div className="flex items-center justify-between mb-2"><div className="flex items-center gap-2"><Shield className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Administradores</span></div><Button variant="ghost" size="sm" className="h-7 text-xs" onClick={e => { e.stopPropagation(); setSelectedEnvForAdmin(env); setAdminEmail(""); setAdminDialogOpen(true); }}><UserPlus className="h-3 w-3 mr-1" />Adicionar</Button></div>{!env.admins || env.admins.length === 0 ? <p className="text-xs text-muted-foreground">Nenhum administrador definido</p> : <div className="space-y-1">{env.admins.map(admin => <div key={admin.id} className="flex items-center gap-2 p-1.5 bg-background rounded"><Avatar className="h-6 w-6"><AvatarImage src={admin.profile.avatar_url || undefined} /><AvatarFallback className="text-xs">{admin.profile.full_name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar><div className="flex-1 min-w-0"><p className="text-xs font-medium truncate">{admin.profile.full_name}</p><p className="text-xs text-muted-foreground truncate">{admin.profile.email}</p></div><Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={e => { e.stopPropagation(); handleRemoveAdmin(admin.id, admin.profile.full_name); }}><X className="h-3 w-3" /></Button></div>)}</div>}</div>
           <div><p className="text-sm font-medium mb-2">Funcionários</p>{getEnvironmentEmployees(env.id).length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">Nenhum funcionário neste ambiente</p> : <div className="space-y-2">{getEnvironmentEmployees(env.id).map(emp => { const initials = emp.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase(); return <div key={emp.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => { setSelectedEmployee(emp); setSelectedEnvId(env.id); setAssignDialogOpen(true); }}><Avatar className="h-8 w-8"><AvatarImage src={emp.avatar_url || undefined} /><AvatarFallback className="text-xs">{initials}</AvatarFallback></Avatar><div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{emp.full_name}</p><p className="text-xs text-muted-foreground truncate">{emp.email}</p></div><Button variant="ghost" size="sm" className="text-xs">Alterar</Button></div>; })}</div>}</div>
         </CardContent></CollapsibleContent></Collapsible></Card>)}
