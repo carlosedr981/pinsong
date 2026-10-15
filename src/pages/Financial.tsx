@@ -84,7 +84,9 @@ export default function Financial() {
         return `${formatDate(s.date)}${confirmation ? " 🟢" : ""} ${time} ${money(Number(s.daily_rate || 0))}`;
       }),
       "",
-      `*Total: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}*`,
+      `*Total do período: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}*`,
+      `Confirmado: ${money(employee.schedules.filter((s: any) => s.confirmed === true).reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}`,
+      `Pendente: ${money(employee.schedules.filter((s: any) => s.confirmed !== true).reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}`,
     ];
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
