@@ -25,6 +25,7 @@ export default function Financial() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState("all");
+  const [selectedFortnight, setSelectedFortnight] = useState<"all" | "first" | "second">("first");
 
   useEffect(() => {
     const load = async () => {
