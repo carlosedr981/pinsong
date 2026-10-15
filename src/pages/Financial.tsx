@@ -52,7 +52,7 @@ export default function Financial() {
     load().catch((error) => { console.error("Erro ao carregar financeiro:", error); toast({ variant: "destructive", title: "Erro financeiro", description: error?.message || "Não foi possível carregar os valores." }); setLoading(false); });
   }, [user, month, navigate, toast]);
 
-  const visibleSchedules = useMemo(() => selectedEmployee === "all" ? schedules : schedules.filter((s) => s.employee_id === selectedEmployee), [schedules, selectedEmployee]);
+  const visibleSchedules = useMemo(() => schedules.filter((s) => (selectedEmployee === "all" || s.employee_id === selectedEmployee) && (selectedFortnight === "all" || (selectedFortnight === "first" ? getDay(s.date) >= 1 && getDay(s.date) <= 15 : getDay(s.date) >= 16)), [schedules, selectedEmployee, selectedFortnight]);
 
   const byEnvironment = useMemo(() => environments.filter((env) => visibleSchedules.some((s) => s.environment_id === env.id && Number(s.daily_rate || 0) > 0)).map((env) => {
     const envSchedules = visibleSchedules.filter((s) => s.environment_id === env.id);
