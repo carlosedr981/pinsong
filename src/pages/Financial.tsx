@@ -54,7 +54,7 @@ export default function Financial() {
     load().catch((error) => { console.error("Erro ao carregar financeiro:", error); toast({ variant: "destructive", title: "Erro financeiro", description: error?.message || "Não foi possível carregar os valores." }); setLoading(false); });
   }, [user, month, navigate, toast]);
 
-  const preserveScrollOnFilterChange = (update: () => void) => { const scrollY = window.scrollY || document.documentElement.scrollTop || 0; update(); window.requestAnimationFrame(() => { window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior }); }); };
+  const preserveScrollOnFilterChange = (update: () => void) => { const scrollY = window.scrollY || document.documentElement.scrollTop || 0; update(); window.requestAnimationFrame(() => { window.scrollTo({ top: scrollY, behavior: "auto" }); }); };
 
   const visibleSchedules = useMemo(() => schedules.filter((s) => (selectedEmployee === "all" || s.employee_id === selectedEmployee) && (selectedFortnight === "all" || (selectedFortnight === "first" ? getDay(s.date) >= 1 && getDay(s.date) <= 15 : getDay(s.date) >= 16))), [schedules, selectedEmployee, selectedFortnight]);
 
