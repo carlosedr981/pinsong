@@ -121,6 +121,8 @@
     @apply border-border;
   }
 
+  html, body, #root { min-height: 100%; height: auto; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
