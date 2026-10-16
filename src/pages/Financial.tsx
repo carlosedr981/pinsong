@@ -11,13 +11,15 @@ import { supabase } from "@/integrations/supabase/client";
 const db = supabase as any;
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const getDay = (date: string | null | undefined) => Number(String(date || "").slice(8, 10)) || 0;
+const localMonth = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+const currentFortnight = (): "first" | "second" => new Date().getDate() <= 15 ? "first" : "second";
 const formatDate = (date: string) => { const [, month, day] = date.split("-"); return `${day}/${month}`; };
 
 export default function Financial() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(localMonth());
   const [environments, setEnvironments] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [registros, setRegistros] = useState<any[]>([]);
@@ -25,7 +27,7 @@ export default function Financial() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState("all");
-  const [selectedFortnight, setSelectedFortnight] = useState<"all" | "first" | "second">("first");
+  const [selectedFortnight, setSelectedFortnight] = useState<"all" | "first" | "second">(currentFortnight());
 
   useEffect(() => {
     const load = async () => {
@@ -51,6 +53,8 @@ export default function Financial() {
     };
     load().catch((error) => { console.error("Erro ao carregar financeiro:", error); toast({ variant: "destructive", title: "Erro financeiro", description: error?.message || "Não foi possível carregar os valores." }); setLoading(false); });
   }, [user, month, navigate, toast]);
+
+  const preserveScrollOnFilterChange = (update: () => void) => { const scrollY = window.scrollY || document.documentElement.scrollTop || 0; update(); window.requestAnimationFrame(() => { window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior }); }); };
 
   const visibleSchedules = useMemo(() => schedules.filter((s) => (selectedEmployee === "all" || s.employee_id === selectedEmployee) && (selectedFortnight === "all" || (selectedFortnight === "first" ? getDay(s.date) >= 1 && getDay(s.date) <= 15 : getDay(s.date) >= 16))), [schedules, selectedEmployee, selectedFortnight]);
 
@@ -101,7 +105,7 @@ export default function Financial() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return <div className="min-h-screen bg-background">
-    <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados pelas escalas ainda não confirmadas. As escalas confirmadas entram automaticamente no total registrado.</p></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row print:hidden"><div className="flex flex-col sm:flex-row gap-2 print:hidden"><select value={selectedFortnight} onChange={(e) => setSelectedFortnight(e.target.value as "all" | "first" | "second")} className="h-9 rounded-md border bg-background px-3 text-sm"><option value="first">1ª quinzena (1–15)</option><option value="second">2ª quinzena (16–fim)</option><option value="all">Mês inteiro</option></select><select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm"><option value="all">Todos os funcionários</option>{profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select><Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Relatório mensal</Button></div><input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground" /></div></div></div>
+    <div className="gradient-hero p-4 pt-8 pb-6"><div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-6xl mx-auto"><Button variant="ghost" size="icon" onClick={() => navigate("/admin")} className="text-primary-foreground"><ArrowLeft /></Button><div className="flex-1 min-w-0"><h1 className="text-xl font-bold text-primary-foreground">Financeiro por Ambiente</h1><p className="text-sm text-primary-foreground/80">Os valores pendentes são calculados pelas escalas ainda não confirmadas. As escalas confirmadas entram automaticamente no total registrado.</p></div><div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row print:hidden"><div className="flex flex-col sm:flex-row gap-2 print:hidden"><select value={selectedFortnight} onChange={(e) => preserveScrollOnFilterChange(() => setSelectedFortnight(e.target.value as "all" | "first" | "second"))} onBlur={(e) => e.currentTarget.blur()} className="h-11 w-full sm:w-auto rounded-md border bg-background px-3 text-base sm:text-sm"><option value="first">1ª quinzena (1–15)</option><option value="second">2ª quinzena (16–fim)</option><option value="all">Mês inteiro</option></select><select value={selectedEmployee} onChange={(e) => preserveScrollOnFilterChange(() => setSelectedEmployee(e.target.value))} onBlur={(e) => e.currentTarget.blur()} className="h-11 w-full sm:w-auto rounded-md border bg-background px-3 text-base sm:text-sm"><option value="all">Todos os funcionários</option>{profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select><Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Relatório mensal</Button></div><input type="month" value={month} onChange={(e) => preserveScrollOnFilterChange(() => { setMonth(e.target.value); setSelectedFortnight(currentFortnight()); })} onBlur={(e) => e.currentTarget.blur()} className="h-11 w-full sm:w-auto rounded-md border-0 px-2 bg-background/90 text-foreground text-base sm:text-sm" /></div></div></div>
     <div className="max-w-6xl mx-auto p-4 space-y-4">
       <div className="grid sm:grid-cols-2 gap-3"><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total registrado</p><p className="text-2xl font-bold">{money(totals.registered)}</p></CardContent></Card><Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total pendente das escalas</p><p className="text-2xl font-bold">{money(totals.pending)}</p></CardContent></Card></div>
       {byEnvironment.map((env) => <Card key={env.id} className="border-0 shadow-card"><CardHeader><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-5 w-5 text-primary" /></div><div className="flex-1"><CardTitle className="text-base">{env.name}</CardTitle><p className="text-xs text-muted-foreground">Registrado: {money(env.registeredTotal)}</p></div><Badge variant="secondary">Pendente: {money(env.pendingTotal)}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="grid sm:grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">1º pagamento — dias 1 a 15</p><p className="text-lg font-semibold mt-1">{money(env.firstTotal)}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-sm font-medium">2º pagamento — dias 16 a fim</p><p className="text-lg font-semibold mt-1">{money(env.secondTotal)}</p></div></div><div className="space-y-2">{env.employees.map((e) => <div key={e.id} className="flex flex-wrap items-center gap-3 border rounded-lg p-3"><span className="font-medium flex-1 min-w-[140px]">{e.name}</span><span className="text-xs text-muted-foreground">1–15: {money(e.first)}</span><span className="text-xs text-muted-foreground">16–fim: {money(e.second)}</span></div>)}</div></CardContent></Card>)}
