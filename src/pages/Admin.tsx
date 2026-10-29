@@ -76,7 +76,6 @@ export default function Admin() {
       `✅ Confirmado: *${money(confirmed)}*`,
       `⏳ Pendente: *${money(pending)}*`,
       "",
-      "_Relatório gerado pelo Pinsong_",
     ];
     const message = lines.join("\n");
     try {
