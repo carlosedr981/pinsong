@@ -54,15 +54,27 @@ export default function Admin() {
     const pending = rows.filter((r) => r.confirmed !== true).reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
     const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const lines = [
-      `*ESCALAS DE ${employee.full_name.toLocaleUpperCase("pt-BR")}*`,
-      `Período: ${format(from, "dd/MM/yyyy")} a ${format(to, "dd/MM/yyyy")}`,
+      `📋 *RELATÓRIO DE ESCALAS*`,
+      `👤 *Funcionário:* ${employee.full_name}`,
+      `📅 *Período:* ${format(from, "dd/MM/yyyy")} até ${format(to, "dd/MM/yyyy")}`,
       "",
-      ...(rows.length ? rows.map((r) => `${format(new Date(`${r.date}T12:00:00`), "dd/MM/yyyy")} | ${String(r.start_time || "--:--").slice(0, 5)}-${String(r.end_time || "--:--").slice(0, 5)} | ${money(Number(r.daily_rate || 0))} | ${r.confirmed === true ? "Confirmada" : "Pendente"}${r.notes ? ` | ${r.notes}` : ""}`) : ["Nenhuma escala no período selecionado."]),
+      "*DETALHAMENTO*",
+      ...(rows.length ? rows.map((r, index) => [
+        `*Escala ${index + 1} — ${format(new Date(`${r.date}T12:00:00`), "dd/MM/yyyy")}*`,
+        `   Horário: ${String(r.start_time || "--:--").slice(0, 5)} às ${String(r.end_time || "--:--").slice(0, 5)}`,
+        `   Valor: ${money(Number(r.daily_rate || 0))}`,
+        `   Status: ${r.confirmed === true ? "✅ Confirmada" : "⏳ Pendente"}`,
+        ...(r.notes ? [`   Obs.: ${r.notes}`] : []),
+        "",
+      ].join("\\n")) : ["Nenhuma escala encontrada neste período.", ""]),
+      "━━━━━━━━━━━━━━━━━━",
+      "*RESUMO FINANCEIRO*",
+      `📌 Quantidade de escalas: *${rows.length}*`,
+      `💰 Total do período: *${money(total)}*`,
+      `✅ Confirmado: *${money(confirmed)}*`,
+      `⏳ Pendente: *${money(pending)}*`,
       "",
-      `Quantidade de escalas: ${rows.length}`,
-      `Total do período: ${money(total)}`,
-      `Confirmado: ${money(confirmed)}`,
-      `Pendente: ${money(pending)}`,
+      "_Relatório gerado pelo Pinsong_",
     ];
     const message = lines.join("\n");
     try {
