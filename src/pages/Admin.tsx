@@ -46,20 +46,22 @@ export default function Admin() {
       toast({ variant: "destructive", title: "Período inválido", description: "Confira as datas inicial e final." });
       return;
     }
-    const rows = employee.registros.filter((r) => { const d = new Date(r.timestamp); return d >= from && d <= to; }).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    const total = rows.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
-    const paid = rows.filter((r) => r.paid).reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
-    const pending = rows.filter((r) => !r.paid).reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
+    const { data: schedules, error: schedulesError } = await supabase.from("work_schedules").select("date,start_time,end_time,shift_type,daily_rate,confirmed,notes,environment_id").eq("employee_id", employee.id).gte("date", reportStart).lte("date", reportEnd).order("date").order("start_time");
+    if (schedulesError) throw schedulesError;
+    const rows = schedules || [];
+    const total = rows.reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
+    const confirmed = rows.filter((r) => r.confirmed === true).reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
+    const pending = rows.filter((r) => r.confirmed !== true).reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
     const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const lines = [
-      `*REGISTROS DE ${employee.full_name.toLocaleUpperCase("pt-BR")}*`,
+      `*ESCALAS DE ${employee.full_name.toLocaleUpperCase("pt-BR")}*`,
       `Período: ${format(from, "dd/MM/yyyy")} a ${format(to, "dd/MM/yyyy")}`,
       "",
-      ...(rows.length ? rows.map((r) => `${format(new Date(r.timestamp), "dd/MM/yyyy")} às ${format(new Date(r.timestamp), "HH:mm:ss")} | ${money(Number(r.value_per_registro || 0))} | ${r.paid ? "Pago" : "Pendente"}`) : ["Nenhum registro no período selecionado."]),
+      ...(rows.length ? rows.map((r) => `${format(new Date(`${r.date}T12:00:00`), "dd/MM/yyyy")} | ${String(r.start_time || "--:--").slice(0, 5)}-${String(r.end_time || "--:--").slice(0, 5)} | ${money(Number(r.daily_rate || 0))} | ${r.confirmed === true ? "Confirmada" : "Pendente"}${r.notes ? ` | ${r.notes}` : ""}`) : ["Nenhuma escala no período selecionado."]),
       "",
-      `Quantidade de registros: ${rows.length}`,
+      `Quantidade de escalas: ${rows.length}`,
       `Total do período: ${money(total)}`,
-      `Pago: ${money(paid)}`,
+      `Confirmado: ${money(confirmed)}`,
       `Pendente: ${money(pending)}`,
     ];
     const message = lines.join("\n");
@@ -72,7 +74,7 @@ export default function Admin() {
         const copied = document.execCommand("copy"); document.body.removeChild(area);
         if (!copied) throw new Error("copy failed");
       }
-      toast({ title: "Relatório copiado", description: `Foram copiados ${rows.length} registros de ${employee.full_name}. Cole no WhatsApp.` });
+      toast({ title: "Relatório copiado", description: `Foram copiadas ${rows.length} escalas de ${employee.full_name}. Cole no WhatsApp.` });
     } catch {
       toast({ variant: "destructive", title: "Não foi possível copiar", description: "Tente novamente ou abra o app em um navegador atualizado." });
     }
