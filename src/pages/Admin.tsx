@@ -62,7 +62,7 @@ export default function Admin() {
       `Pago: ${money(paid)}`,
       `Pendente: ${money(pending)}`,
     ];
-    const message = lines.join("\\n");
+    const message = lines.join("\n");
     try {
       if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(message);
       else {
