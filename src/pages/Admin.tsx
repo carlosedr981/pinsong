@@ -47,7 +47,7 @@ export default function Admin() {
       return;
     }
     const { data: schedules, error: schedulesError } = await supabase.from("work_schedules").select("date,start_time,end_time,shift_type,daily_rate,confirmed,notes,environment_id").eq("employee_id", employee.id).gte("date", reportStart).lte("date", reportEnd).order("date").order("start_time");
-    if (schedulesError) throw schedulesError;
+    if (schedulesError) { toast({ variant: "destructive", title: "Erro ao buscar escalas", description: schedulesError.message || "Não foi possível carregar as escalas desse funcionário." }); return; }
     const rows = schedules || [];
     const total = rows.reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
     const confirmed = rows.filter((r) => r.confirmed === true).reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
