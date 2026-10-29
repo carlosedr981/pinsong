@@ -66,7 +66,7 @@ export default function Admin() {
         `   Status: ${r.confirmed === true ? "✅ Confirmada" : "⏳ Pendente"}`,
         ...(r.notes ? [`   Obs.: ${r.notes}`] : []),
         "",
-      ].join("\\n")) : ["Nenhuma escala encontrada neste período.", ""]),
+      ].join("\n")) : ["Nenhuma escala encontrada neste período.", ""]),
       "━━━━━━━━━━━━━━━━━━",
       "*RESUMO FINANCEIRO*",
       `📌 Quantidade de escalas: *${rows.length}*`,
