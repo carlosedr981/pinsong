@@ -62,7 +62,7 @@ export default function Dashboard() {
   const [hourlyRate, setHourlyRate] = useState<number>(20);
   const [userEnvironmentId, setUserEnvironmentId] = useState<string | null>(null);
   const [scheduleStats, setScheduleStats] = useState({ total: 0, confirmed: 0, pending: 0, value: 0 });
-  const [personalFinancial, setPersonalFinancial] = useState({ receivable: 0, pending: 0 });
+  const [personalFinancial, setPersonalFinancial] = useState({ receivable: 0, pending: 0, firstReceivable: 0, firstPending: 0, secondReceivable: 0, secondPending: 0 });
   const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -159,15 +159,23 @@ export default function Dashboard() {
       const end = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
       const { data, error } = await supabase
         .from("work_schedules")
-        .select("daily_rate, confirmed")
+        .select("date, daily_rate, confirmed")
         .eq("employee_id", user.id)
         .gte("date", start)
         .lt("date", end);
       if (error) return;
       const rows = data || [];
+      const sumValue = (items: any[]) => items.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0);
+      const confirmed = rows.filter((s: any) => s.confirmed === true);
+      const pending = rows.filter((s: any) => s.confirmed !== true);
+      const firstHalf = (s: any) => Number(String(s.date || "").slice(8, 10)) <= 15;
       setPersonalFinancial({
-        receivable: rows.filter((s: any) => s.confirmed === true).reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0),
-        pending: rows.filter((s: any) => s.confirmed !== true).reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0),
+        receivable: sumValue(confirmed),
+        pending: sumValue(pending),
+        firstReceivable: sumValue(confirmed.filter(firstHalf)),
+        firstPending: sumValue(pending.filter(firstHalf)),
+        secondReceivable: sumValue(confirmed.filter((s: any) => !firstHalf(s))),
+        secondPending: sumValue(pending.filter((s: any) => !firstHalf(s))),
       });
     };
     loadPersonalFinancial();
@@ -243,7 +251,7 @@ export default function Dashboard() {
       </div>
       <div className="mx-auto -mt-12 max-w-3xl space-y-4 px-3 pb-8 sm:space-y-6 sm:px-4">
         <Card className="overflow-hidden border-0 shadow-xl"><CardContent className="p-4 sm:p-6"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Status de Hoje</p><p className="text-base font-semibold sm:text-lg">{todayRegistros.length} registro{todayRegistros.length !== 1 ? "s" : ""}</p></div>{lastRegistro && <div className="shrink-0 text-right"><p className="text-sm text-muted-foreground">Último Registro</p><p className="text-base font-semibold sm:text-lg">{format(new Date(lastRegistro.timestamp), "HH:mm")}</p></div>}</div><Button onClick={() => setShowCamera(true)} className="h-14 w-full text-base font-semibold gradient-primary shadow-glow sm:text-lg" size="lg"><Camera className="mr-2 h-6 w-6" />Registrar Ponto</Button></CardContent></Card>
-<Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Resumo das escalas de hoje</p><p className="text-xs text-muted-foreground">Acompanhe rapidamente o que está confirmado.</p></div><Users className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Escalas</p><p className="text-xl font-bold">{scheduleStats.total}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmadas</p><p className="text-xl font-bold">{scheduleStats.confirmed}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendentes</p><p className="text-xl font-bold">{scheduleStats.pending}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor previsto</p><p className="text-base font-bold">{scheduleStats.value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card><Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Meu financeiro</p><p className="text-xs text-muted-foreground">Valores conforme as escalas programadas deste mês.</p></div><Wallet className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">A receber</p><p className="text-xl font-bold">{personalFinancial.receivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendente</p><p className="text-xl font-bold">{personalFinancial.pending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card>
+<Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Resumo das escalas de hoje</p><p className="text-xs text-muted-foreground">Acompanhe rapidamente o que está confirmado.</p></div><Users className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Escalas</p><p className="text-xl font-bold">{scheduleStats.total}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmadas</p><p className="text-xl font-bold">{scheduleStats.confirmed}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendentes</p><p className="text-xl font-bold">{scheduleStats.pending}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor previsto</p><p className="text-base font-bold">{scheduleStats.value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card><Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Meu financeiro</p><p className="text-xs text-muted-foreground">Valores conforme as escalas programadas deste mês.</p></div><Wallet className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">A receber</p><p className="text-xl font-bold">{personalFinancial.receivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendente</p><p className="text-xl font-bold">{personalFinancial.pending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div><div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"><div className="rounded-lg border p-3"><p className="text-sm font-semibold">1ª quinzena · dias 1 a 15</p><div className="mt-2 grid grid-cols-2 gap-2"><div><p className="text-xs text-muted-foreground">Confirmado</p><p className="text-sm font-semibold">{personalFinancial.firstReceivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div><p className="text-xs text-muted-foreground">Pendente</p><p className="text-sm font-semibold">{personalFinancial.firstPending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></div><div className="rounded-lg border p-3"><p className="text-sm font-semibold">2ª quinzena · dias 16 ao fim</p><div className="mt-2 grid grid-cols-2 gap-2"><div><p className="text-xs text-muted-foreground">Confirmado</p><p className="text-sm font-semibold">{personalFinancial.secondReceivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div><p className="text-xs text-muted-foreground">Pendente</p><p className="text-sm font-semibold">{personalFinancial.secondPending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></div></div></CardContent></Card>
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
         <RegistrosHierarchy registros={registros} onPhotoClick={setSelectedPhoto} />
         <ScheduleShareDialog isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} environmentId={userEnvironmentId} />
