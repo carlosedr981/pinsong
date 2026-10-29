@@ -46,7 +46,7 @@ export default function Admin() {
       toast({ variant: "destructive", title: "Período inválido", description: "Confira as datas inicial e final." });
       return;
     }
-    const { data: schedules, error: schedulesError } = await supabase.from("work_schedules").select("date,start_time,end_time,shift_type,daily_rate,confirmed,notes,environment_id").eq("employee_id", employee.id).gte("date", reportStart).lte("date", reportEnd).order("date").order("start_time");
+    const { data: schedules, error: schedulesError } = await supabase.from("work_schedules").select("date,start_time,end_time,shift_type,daily_rate,confirmed,notes,environment_id,environments(name)").eq("employee_id", employee.id).gte("date", reportStart).lte("date", reportEnd).order("date").order("start_time");
     if (schedulesError) { toast({ variant: "destructive", title: "Erro ao buscar escalas", description: schedulesError.message || "Não foi possível carregar as escalas desse funcionário." }); return; }
     const rows = schedules || [];
     const total = rows.reduce((sum, r) => sum + Number(r.daily_rate || 0), 0);
@@ -56,11 +56,13 @@ export default function Admin() {
     const lines = [
       `📋 *RELATÓRIO DE ESCALAS*`,
       `👤 *Funcionário:* ${employee.full_name}`,
+      `🏢 *Ambiente(s):* ${Array.from(new Set(rows.map((r: any) => r.environments?.name).filter(Boolean))).join(", ") || "Não informado"}`,
       `📅 *Período:* ${format(from, "dd/MM/yyyy")} até ${format(to, "dd/MM/yyyy")}`,
       "",
       "*DETALHAMENTO*",
       ...(rows.length ? rows.map((r, index) => [
         `*Escala ${index + 1} — ${format(new Date(`${r.date}T12:00:00`), "dd/MM/yyyy")}*`,
+        `   Ambiente: ${r.environments?.name || "Não informado"}`,
         `   Horário: ${String(r.start_time || "--:--").slice(0, 5)} às ${String(r.end_time || "--:--").slice(0, 5)}`,
         `   Valor: ${money(Number(r.daily_rate || 0))}`,
         `   Status: ${r.confirmed === true ? "✅ Confirmada" : "⏳ Pendente"}`,
