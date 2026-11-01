@@ -242,7 +242,7 @@ export default function Dashboard() {
           </div>
           <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
             {userProfile && <ProfileEditDialog profile={userProfile} onSave={handleProfileSave} />}
-            <Button variant="ghost" size="icon" aria-label="Meu Dashboard" onClick={() => navigate("/my-dashboard")} className="h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><ChartNoAxesCombined className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="sm" aria-label="Meu Dashboard" onClick={() => navigate("/my-dashboard")} className="h-10 gap-1.5 px-2 text-primary-foreground hover:bg-primary-foreground/10"><ChartNoAxesCombined className="h-5 w-5 shrink-0" /><span className="hidden sm:inline">Meu progresso</span></Button>
             <Button variant="ghost" size="icon" aria-label="Tickets" onClick={() => navigate("/tickets")} className="relative h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><MessageSquare className="h-5 w-5" />{unreadCount > 0 && <Badge className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center border-0 bg-destructive p-0 text-[10px]">{unreadCount > 9 ? "9+" : unreadCount}</Badge>}</Button>
             {isAdmin && <Button variant="ghost" size="icon" aria-label="Administração" onClick={() => navigate("/admin")} className="h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><Shield className="h-5 w-5" /></Button>}
             <Button variant="ghost" size="icon" aria-label="Sair" onClick={signOut} className="h-10 w-10 text-primary-foreground hover:bg-primary-foreground/10"><LogOut className="h-5 w-5" /></Button>
