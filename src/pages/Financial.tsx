@@ -110,7 +110,8 @@ export default function Financial() {
       ...employee.schedules.map((s: any) => {
         const time = s.start_time && s.end_time ? `${String(s.start_time).slice(0, 5)}-${String(s.end_time).slice(0, 5)}` : "--";
         const confirmation = s.confirmed === true ? " 🟢" : "";
-        return `${formatDate(s.date)}${confirmation ? " 🟢" : ""} ${time} ${money(Number(s.daily_rate || 0))}`;
+        const scheduleLine = `${formatDate(s.date)}${confirmation ? " 🟢" : ""} ${time} ${money(Number(s.daily_rate || 0))}`;
+        return s.notes?.trim() ? `${scheduleLine}\n   📝 Observação: ${s.notes.trim()}` : scheduleLine;
       }),
       "",
       `*Total do período: ${money(employee.schedules.reduce((sum: number, s: any) => sum + Number(s.daily_rate || 0), 0))}*`,
