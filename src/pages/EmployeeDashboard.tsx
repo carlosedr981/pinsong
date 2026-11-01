@@ -82,7 +82,11 @@ export default function EmployeeDashboard() {
     }, 0);
     const registrationValue = registros.reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
     const registrationPaid = registros.filter((r) => r.paid).reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
-    return { total: schedules.length, completed: completed.length, upcoming: upcoming.length, confirmed: confirmed.length, pending: schedules.filter((s) => s.confirmed !== true).length, paid: paid.length, totalValue, paidValue, confirmedValue, pendingValue, hours, registrationCount: registros.length, registrationValue, registrationPaid };
+    const registrationPending = registros.filter((r) => !r.paid).reduce((sum, r) => sum + Number(r.value_per_registro || 0), 0);
+    const averageValue = schedules.length ? totalValue / schedules.length : 0;
+    const confirmationRate = schedules.length ? confirmed.length / schedules.length * 100 : 0;
+    const paymentRate = schedules.length ? paid.length / schedules.length * 100 : 0;
+    return { total: schedules.length, completed: completed.length, upcoming: upcoming.length, confirmed: confirmed.length, pending: schedules.filter((s) => s.confirmed !== true).length, paid: paid.length, totalValue, paidValue, confirmedValue, pendingValue, hours, registrationCount: registros.length, registrationValue, registrationPaid, registrationPending, averageValue, confirmationRate, paymentRate, totalReceived: paidValue + registrationPaid, totalPending: pendingValue + registrationPending };
   }, [schedules, registros]);
 
   const monthly = useMemo(() => {
@@ -96,10 +100,12 @@ export default function EmployeeDashboard() {
   }, [schedules, period]);
 
   const paymentMix = [
-    { name: "Pago", value: stats.paidValue },
-    { name: "Aguardando pagamento", value: stats.pendingValue },
-    { name: "Ainda não confirmado", value: Math.max(0, stats.totalValue - stats.paidValue - stats.pendingValue) },
+    { name: "Pago em escalas", value: stats.paidValue },
+    { name: "A receber confirmado", value: stats.pendingValue },
+    { name: "Aguardando confirmação", value: Math.max(0, stats.totalValue - stats.paidValue - stats.pendingValue) },
   ].filter((x) => x.value > 0);
+  const environmentBreakdown = useMemo(() => Object.entries(schedules.reduce((acc, s) => { const name = s.environment_id ? environmentNames[s.environment_id] || "Ambiente" : "Sem ambiente"; acc[name] = (acc[name] || 0) + Number(s.daily_rate || 0); return acc; }, {} as Record<string, number>)).map(([ambiente, valor]) => ({ ambiente, valor })).sort((a, b) => b.valor - a.valor), [schedules, environmentNames]);
+  const shiftBreakdown = useMemo(() => { const labels: Record<string, string> = { morning: "Manhã", afternoon: "Tarde", night: "Noite", regular: "Regular" }; const counts = schedules.reduce((acc, s: any) => { const key = labels[s.shift_type || "regular"] || "Regular"; acc[key] = (acc[key] || 0) + 1; return acc; }, {} as Record<string, number>); return Object.entries(counts).map(([turno, quantidade]) => ({ turno, quantidade })); }, [schedules]);
   const activities = useMemo(() => [
     ...schedules.map((s) => ({ id: "s-" + s.id, date: s.date, title: "Escala", detail: [s.start_time && s.end_time ? s.start_time.slice(0, 5) + "–" + s.end_time.slice(0, 5) : "", s.environment_id ? environmentNames[s.environment_id] || "Ambiente" : ""].filter(Boolean).join(" · "), value: Number(s.daily_rate || 0), status: s.paid_at ? "Pago" : s.confirmed ? "Confirmada" : "Aguardando confirmação", type: "schedule" })),
     ...registros.map((r) => ({ id: "r-" + r.id, date: r.timestamp.slice(0, 10), title: "Registro de ponto", detail: format(new Date(r.timestamp), "HH:mm"), value: Number(r.value_per_registro || 0), status: r.paid ? "Pago" : "Pendente", type: "registro" })),
@@ -133,6 +139,12 @@ export default function EmployeeDashboard() {
         <Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Registros de ponto</p><p className="mt-1 text-lg font-bold">{stats.registrationCount}</p><p className="text-xs text-muted-foreground">Valor associado: {money(stats.registrationValue)}</p></CardContent></Card>
       </section>
 
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total recebido (escalas + ponto)</p><p className="mt-1 text-lg font-bold text-emerald-600">{money(stats.totalReceived)}</p><p className="text-xs text-muted-foreground">{money(stats.paidValue)} em escalas · {money(stats.registrationPaid)} em ponto</p></CardContent></Card>
+        <Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total pendente (escalas + ponto)</p><p className="mt-1 text-lg font-bold">{money(stats.totalPending)}</p><p className="text-xs text-muted-foreground">{money(stats.pendingValue)} confirmado · {money(stats.registrationPending)} em ponto</p></CardContent></Card>
+        <Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Média por escala</p><p className="mt-1 text-lg font-bold">{money(stats.averageValue)}</p><p className="text-xs text-muted-foreground">Considera todo o histórico</p></CardContent></Card>
+        <Card className="border-0 shadow-card"><CardContent className="p-4"><p className="text-xs text-muted-foreground">Registros de ponto pendentes</p><p className="mt-1 text-lg font-bold">{registros.filter((r) => !r.paid).length}</p><p className="text-xs text-muted-foreground">{money(stats.registrationPending)} aguardando pagamento</p></CardContent></Card>
+      </section>
       <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <Card className="border-0 shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0"><div><CardTitle className="text-base">Evolução mensal</CardTitle><p className="text-xs text-muted-foreground">Quantidade de escalas e valores previstos</p></div><select aria-label="Período do gráfico" value={period} onChange={(e) => setPeriod(e.target.value as any)} className="h-9 rounded-md border bg-background px-2 text-sm"><option value="6">6 meses</option><option value="12">12 meses</option><option value="all">Últimos 12 meses</option></select></CardHeader>
@@ -147,6 +159,10 @@ export default function EmployeeDashboard() {
         </Card>
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card className="border-0 shadow-card"><CardHeader><CardTitle className="text-base">Valores por ambiente</CardTitle><p className="text-xs text-muted-foreground">Soma de todas as escalas do seu histórico.</p></CardHeader><CardContent className="h-64">{environmentBreakdown.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={environmentBreakdown} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 4 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} /><XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => "R$" + v} /><YAxis type="category" dataKey="ambiente" width={100} tick={{ fontSize: 10 }} /><Tooltip formatter={(value: number) => money(value)} /><Bar dataKey="valor" name="Valor previsto" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer> : <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Sem escalas cadastradas.</div>}</CardContent></Card>
+        <Card className="border-0 shadow-card"><CardHeader><CardTitle className="text-base">Escalas por turno</CardTitle><p className="text-xs text-muted-foreground">Distribuição de todas as escalas registradas.</p></CardHeader><CardContent className="space-y-4 pt-2">{shiftBreakdown.length ? shiftBreakdown.map((item) => <div key={item.turno}><div className="mb-1 flex justify-between text-sm"><span>{item.turno}</span><strong>{item.quantidade} ({stats.total ? Math.round(item.quantidade / stats.total * 100) : 0}%)</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (stats.total ? item.quantidade / stats.total * 100 : 0) + "%" }} /></div></div>) : <p className="py-8 text-center text-sm text-muted-foreground">Sem escalas cadastradas.</p>}</CardContent></Card>
+      </section>
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="border-0 shadow-card"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Banknote className="h-4 w-4 text-primary" />Resumo financeiro</CardTitle></CardHeader><CardContent className="space-y-3">
           <div className="flex justify-between gap-3"><span className="text-sm text-muted-foreground">Total previsto nas escalas</span><strong>{money(stats.totalValue)}</strong></div>
@@ -156,9 +172,9 @@ export default function EmployeeDashboard() {
           <div className="border-t pt-3"><div className="flex justify-between gap-3"><span className="text-sm text-muted-foreground">Pagamentos de registros de ponto</span><strong>{money(stats.registrationPaid)}</strong></div><p className="mt-1 text-xs text-muted-foreground">Os pagamentos de ponto são exibidos separadamente das escalas para evitar somar valores de origens diferentes.</p></div>
         </CardContent></Card>
         <Card className="border-0 shadow-card"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><BriefcaseBusiness className="h-4 w-4 text-primary" />Desempenho nas escalas</CardTitle></CardHeader><CardContent className="space-y-4">
-          <div><div className="mb-1 flex justify-between text-sm"><span className="text-muted-foreground">Taxa de confirmação</span><strong>{stats.total ? Math.round(stats.confirmed / stats.total * 100) : 0}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (stats.total ? stats.confirmed / stats.total * 100 : 0) + "%" }} /></div></div>
-          <div><div className="mb-1 flex justify-between text-sm"><span className="text-muted-foreground">Taxa de pagamento</span><strong>{stats.total ? Math.round(stats.paid / stats.total * 100) : 0}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-600" style={{ width: (stats.total ? stats.paid / stats.total * 100 : 0) + "%" }} /></div></div>
-          <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor médio por escala</p><strong>{money(stats.total ? stats.totalValue / stats.total : 0)}</strong></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Média de horas por escala</p><strong>{(stats.total ? stats.hours / stats.total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h</strong></div></div>
+          <div><div className="mb-1 flex justify-between text-sm"><span className="text-muted-foreground">Taxa de confirmação</span><strong>{stats.total ? Math.round(stats.confirmationRate)}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (stats.total ? stats.confirmed / stats.total * 100 : 0) + "%" }} /></div></div>
+          <div><div className="mb-1 flex justify-between text-sm"><span className="text-muted-foreground">Taxa de pagamento</span><strong>{stats.total ? Math.round(stats.paymentRate)}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-600" style={{ width: (stats.total ? stats.paid / stats.total * 100 : 0) + "%" }} /></div></div>
+          <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor médio por escala</p><strong>{money(stats.averageValue)}</strong></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Média de horas por escala</p><strong>{(stats.total ? stats.hours / stats.total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h</strong></div></div>
         </CardContent></Card>
       </section>
 
