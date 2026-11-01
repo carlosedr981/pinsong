@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Camera, Shield, MessageSquare, Users, Wallet, ChartNoAxesCombined } from "lucide-react";
+import { Clock, LogOut, Camera, Shield, MessageSquare, Users, Wallet, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
