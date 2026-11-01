@@ -25,6 +25,7 @@ interface ShareSchedule {
   shift_type: string;
   start_time: string | null;
   end_time: string | null;
+  notes: string | null;
 }
 
 const periodLabel = (value: string) => ({
@@ -62,7 +63,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
       }
       let query = db
         .from("work_schedules")
-        .select("employee_id, environment_id, date, shift_type, start_time, end_time")
+        .select("employee_id, environment_id, date, shift_type, start_time, end_time, notes")
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date")
@@ -105,6 +106,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
         shift_type: item.shift_type || "regular",
         start_time: item.start_time || null,
         end_time: item.end_time || null,
+        notes: item.notes || null,
       })));
     } catch (error: any) {
       toast({
@@ -151,7 +153,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
         const time = item.start_time && item.end_time
           ? item.start_time.slice(0, 5) + " às " + item.end_time.slice(0, 5)
           : "Horário não informado";
-        return "• *" + item.employee_name + "*\n  " + time + " | " + periodLabel(item.shift_type) + " | " + item.environment_name;
+        return "• *" + item.employee_name + "*\n  " + time + " | " + periodLabel(item.shift_type) + " | " + item.environment_name + (item.notes?.trim() ? "\n  📝 Observação: " + item.notes.trim() : "");
       });
       return "*" + dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1) + "*\n" + lines.join("\n");
     })
