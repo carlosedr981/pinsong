@@ -11,6 +11,7 @@ import Environments from "./pages/Environments";
 import EmployeeEnvironments from "./pages/EmployeeEnvironments";
 import Financial from "./pages/Financial";
 import Tickets from "./pages/Tickets";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/environments" element={<Environments />} />
             <Route path="/employee-environments" element={<EmployeeEnvironments />} />
             <Route path="/financial" element={<Financial />} />
+            <Route path="/my-dashboard" element={<EmployeeDashboard />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
