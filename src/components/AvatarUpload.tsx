@@ -21,7 +21,6 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast({
         variant: "destructive",
@@ -31,7 +30,6 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         variant: "destructive",
@@ -42,33 +40,26 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
     }
 
     setUploading(true);
+    let uploadedPath: string | null = null;
 
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${userId}/avatar.${fileExt}`;
+      const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const fileName = `${userId}/${crypto.randomUUID()}.${extension}`;
 
-      // Delete old avatar if exists
-      await supabase.storage.from("avatars").remove([fileName]);
-
-      // Upload new avatar
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, file, {
-          upsert: true,
+          cacheControl: "3600",
+          upsert: false,
           contentType: file.type,
         });
 
       if (uploadError) throw uploadError;
+      uploadedPath = fileName;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
+      const urlWithCacheBust = `${data.publicUrl}?t=${Date.now()}`;
 
-      // Add cache-busting query param
-      const urlWithCacheBust = `${publicUrl}?t=${Date.now()}`;
-
-      // Update profile
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: urlWithCacheBust })
@@ -77,23 +68,27 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
       if (updateError) throw updateError;
 
       onAvatarUpdate(urlWithCacheBust);
-      
       toast({
         title: "Foto atualizada!",
         description: "Sua foto de perfil foi atualizada com sucesso.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error uploading avatar:", error);
+
+      if (uploadedPath) {
+        const { error: cleanupError } = await supabase.storage.from("avatars").remove([uploadedPath]);
+        if (cleanupError) console.error("Error cleaning up uploaded avatar:", cleanupError);
+      }
+
+      const errorMessage = error instanceof Error ? error.message : "Verifique sua conexão e tente novamente.";
       toast({
         variant: "destructive",
         title: "Erro ao atualizar foto",
-        description: "Não foi possível atualizar sua foto. Tente novamente.",
+        description: errorMessage,
       });
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -112,7 +107,7 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
           {initials || <User className="h-6 w-6" />}
         </AvatarFallback>
       </Avatar>
-      
+
       <Button
         size="icon"
         variant="secondary"
@@ -126,7 +121,7 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
           <Camera className="h-3.5 w-3.5" />
         )}
       </Button>
-      
+
       <input
         ref={fileInputRef}
         type="file"
