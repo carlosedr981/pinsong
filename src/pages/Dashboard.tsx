@@ -237,7 +237,7 @@ export default function Dashboard() {
       <div className="gradient-hero rounded-b-[2rem] px-3 pb-20 pt-6 sm:p-4 sm:pb-20 sm:pt-8">
         <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            {user && profile && <AvatarUpload userId={user.id} currentAvatarUrl={avatarUrl} fullName={profile.full_name} onAvatarUpdate={setAvatarUrl} />}
+            {user && profile && <AvatarUpload userId={user.id} currentAvatarUrl={avatarUrl} fullName={profile.full_name} onAvatarUpdate={(url) => { setAvatarUrl(url); refetchProfile(); }} />}
             <div className="min-w-0"><p className="text-primary-foreground/80 text-sm">Olá,</p><p className="truncate text-sm font-semibold text-primary-foreground sm:text-base">{profile?.full_name || "Funcionário"}</p></div>
           </div>
           <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
