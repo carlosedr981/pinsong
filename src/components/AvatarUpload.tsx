@@ -62,14 +62,19 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
       const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
       const urlWithCacheBust = `${data.publicUrl}?t=${Date.now()}`;
 
-      const { error: updateError } = await supabase
+      const { data: savedProfile, error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: urlWithCacheBust })
-        .eq("id", userId);
+        .eq("id", userId)
+        .select("id, avatar_url")
+        .maybeSingle();
 
       if (updateError) throw updateError;
+      if (!savedProfile?.avatar_url) {
+        throw new Error("O Supabase não confirmou a gravação da foto. Verifique as permissões de atualização da tabela profiles (RLS).");
+      }
 
-      onAvatarUpdate(urlWithCacheBust);
+      onAvatarUpdate(savedProfile.avatar_url);
       toast({
         title: "Foto atualizada!",
         description: "Sua foto de perfil foi atualizada com sucesso.",
