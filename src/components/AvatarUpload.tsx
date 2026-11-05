@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Camera, Loader2, User } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,7 @@ interface AvatarUploadProps {
 
 export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdate }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -101,12 +103,27 @@ export function AvatarUpload({ userId, currentAvatarUrl, fullName, onAvatarUpdat
 
   return (
     <div className="relative">
-      <Avatar className="h-16 w-16 border-2 border-background shadow-md">
-        <AvatarImage src={currentAvatarUrl || undefined} alt={fullName} />
-        <AvatarFallback className="bg-secondary text-secondary-foreground text-lg font-semibold">
-          {initials || <User className="h-6 w-6" />}
-        </AvatarFallback>
-      </Avatar>
+      <button
+        type="button"
+        onClick={() => currentAvatarUrl && setPreviewOpen(true)}
+        className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label="Ampliar foto de perfil"
+        disabled={!currentAvatarUrl}
+      >
+        <Avatar className="h-16 w-16 border-2 border-background shadow-md">
+          <AvatarImage src={currentAvatarUrl || undefined} alt={fullName} />
+          <AvatarFallback className="bg-secondary text-secondary-foreground text-lg font-semibold">
+            {initials || <User className="h-6 w-6" />}
+          </AvatarFallback>
+        </Avatar>
+      </button>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-[min(92vw,560px)] border-0 bg-black/95 p-2">
+          <DialogTitle className="sr-only">Foto de perfil de {fullName}</DialogTitle>
+          <img src={currentAvatarUrl || undefined} alt={fullName} className="max-h-[80vh] w-full rounded-md object-contain" />
+        </DialogContent>
+      </Dialog>
 
       <Button
         size="icon"
