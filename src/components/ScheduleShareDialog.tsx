@@ -63,7 +63,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
       }
       let query = db
         .from("work_schedules")
-        .select("employee_id, environment_id, date, shift_type, start_time, end_time, notes")
+        .select("employee_id, guest_name, environment_id, date, shift_type, start_time, end_time, notes")
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date")
@@ -101,7 +101,7 @@ export function ScheduleShareDialog({ isAdmin, isGlobalAdmin = false, environmen
 
       setSchedules(rows.map((item: any) => ({
         date: item.date,
-        employee_name: profileMap.get(item.employee_id) || "Funcionário",
+        employee_name: item.guest_name || profileMap.get(item.employee_id) || "Funcionário",
         environment_name: environmentMap.get(item.environment_id) || "Sem ambiente",
         shift_type: item.shift_type || "regular",
         start_time: item.start_time || null,
