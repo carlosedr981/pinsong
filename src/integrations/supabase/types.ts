@@ -373,7 +373,8 @@ export type Database = {
           created_by: string
           daily_rate: number | null
           date: string
-          employee_id: string
+          employee_id: string | null
+          guest_name: string | null
           end_time: string | null
           environment_id: string | null
           id: string
@@ -387,7 +388,8 @@ export type Database = {
           created_by: string
           daily_rate?: number | null
           date: string
-          employee_id: string
+          employee_id?: string | null
+          guest_name?: string | null
           end_time?: string | null
           environment_id?: string | null
           id?: string
@@ -401,7 +403,8 @@ export type Database = {
           created_by?: string
           daily_rate?: number | null
           date?: string
-          employee_id?: string
+          employee_id?: string | null
+          guest_name?: string | null
           end_time?: string | null
           environment_id?: string | null
           id?: string
