@@ -26,6 +26,7 @@ export default function EmployeeDashboard() {
   const [environmentNames, setEnvironmentNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"6" | "12" | "all">("6");
+  const [financialMonth, setFinancialMonth] = useState(format(new Date(), "yyyy-MM"));
 
   useEffect(() => {
     if (!user) return;
@@ -98,6 +99,36 @@ export default function EmployeeDashboard() {
       return { month: format(date, "MMM", { locale: ptBR }), escalas: rows.length, valor: rows.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0), recebido: rows.filter((s) => !!s.paid_at).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0) };
     });
   }, [schedules, period]);
+
+  const financialSchedules = useMemo(() => schedules.filter((s) => s.date.startsWith(financialMonth)), [schedules, financialMonth]);
+  const financialGroups = useMemo(() => {
+    const grouped = new Map<string, Schedule[]>();
+    financialSchedules.forEach((schedule) => {
+      const key = schedule.environment_id || "no-environment";
+      const current = grouped.get(key) || [];
+      current.push(schedule);
+      grouped.set(key, current);
+    });
+    return Array.from(grouped.entries()).map(([environmentId, rows]) => {
+      const total = rows.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      const confirmed = rows.filter((row) => row.confirmed === true).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      const pending = rows.filter((row) => row.confirmed !== true).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      const paid = rows.filter((row) => !!row.paid_at).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      return {
+        id: environmentId,
+        name: environmentId === "no-environment" ? "Sem ambiente" : environmentNames[environmentId] || "Ambiente",
+        rows: [...rows].sort((a, b) => a.date.localeCompare(b.date)),
+        total, confirmed, pending, paid,
+        allPaid: rows.length > 0 && rows.every((row) => !!row.paid_at),
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [financialSchedules, environmentNames]);
+  const financialTotals = useMemo(() => financialGroups.reduce((totals, group) => ({
+    total: totals.total + group.total,
+    confirmed: totals.confirmed + group.confirmed,
+    pending: totals.pending + group.pending,
+    paid: totals.paid + group.paid,
+  }), { total: 0, confirmed: 0, pending: 0, paid: 0 }), [financialGroups]);
 
   const paymentMix = [
     { name: "Pago em escalas", value: stats.paidValue },
@@ -177,6 +208,49 @@ export default function EmployeeDashboard() {
           <div className="grid grid-cols-2 gap-2"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor médio por escala</p><strong>{money(stats.averageValue)}</strong></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Média de horas por escala</p><strong>{(stats.total ? stats.hours / stats.total : 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}h</strong></div></div>
         </CardContent></Card>
       </section>
+
+      <Card className="border-0 shadow-card">
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div><CardTitle className="flex items-center gap-2 text-base"><Wallet className="h-4 w-4 text-primary" />Meu financeiro</CardTitle><p className="text-xs text-muted-foreground">Detalhamento das suas escalas, confirmações e pagamentos.</p></div>
+            <input aria-label="Mês do financeiro" type="month" value={financialMonth} onChange={(e) => setFinancialMonth(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Total do período</p><p className="mt-1 font-bold">{money(financialTotals.total)}</p><p className="text-[11px] text-muted-foreground">{financialSchedules.length} registro(s)</p></div>
+            <div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmado</p><p className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">{money(financialTotals.confirmed)}</p></div>
+            <div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendente de confirmação</p><p className="mt-1 font-bold">{money(financialTotals.pending)}</p></div>
+            <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/30"><p className="text-xs text-muted-foreground">Já pago</p><p className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">{money(financialTotals.paid)}</p></div>
+          </div>
+          {financialGroups.length ? financialGroups.map((group) => (
+            <div key={group.id} className="overflow-hidden rounded-xl border">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 p-3">
+                <div><p className="font-semibold">{group.name}</p><p className="text-xs text-muted-foreground">{group.rows.length} registro(s) · {money(group.total)}</p></div>
+                {group.allPaid && <Badge className="border-0 bg-emerald-600 text-white"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />PAGO</Badge>}
+              </div>
+              <div className="space-y-0 px-3">
+                {group.rows.map((schedule) => {
+                  const isPaid = !!schedule.paid_at;
+                  const isConfirmed = schedule.confirmed === true;
+                  return <div key={schedule.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3 last:border-b-0">
+                    <span className="w-12 shrink-0 font-semibold tabular-nums">{dateLabel(schedule.date).slice(0, 5)}</span>
+                    <span className="min-w-0 flex-1 text-sm tabular-nums">{isConfirmed && <span className="mr-1" aria-label="Confirmado">🟢</span>}{schedule.start_time && schedule.end_time ? `${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}` : "Horário não definido"}</span>
+                    <span className="font-medium tabular-nums">{money(Number(schedule.daily_rate || 0))}</span>
+                    <Badge variant={isPaid ? "default" : isConfirmed ? "secondary" : "outline"} className={isPaid ? "shrink-0 border-0 bg-emerald-600 text-white" : "shrink-0"}>{isPaid ? "PAGO" : isConfirmed ? "A RECEBER" : "AGUARDANDO"}</Badge>
+                  </div>;
+                })}
+              </div>
+              <div className="space-y-1 border-t bg-muted/20 p-3 text-sm">
+                <div className="flex justify-between font-semibold"><span>Total do período</span><span>{money(group.total)}</span></div>
+                <div className="flex justify-between text-emerald-700 dark:text-emerald-400"><span>Confirmado</span><span>{money(group.confirmed)}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>Pendente</span><span>{money(group.pending)}</span></div>
+                <div className="flex justify-between font-medium text-emerald-700 dark:text-emerald-400"><span>Pago</span><span>{money(group.paid)}</span></div>
+              </div>
+            </div>
+          )) : <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma escala com valor encontrada neste mês.</p>}
+        </CardContent>
+      </Card>
 
       <Card className="border-0 shadow-card"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4 text-primary" />Atividades recentes</CardTitle><p className="text-xs text-muted-foreground">Últimas escalas e registros vinculados à sua conta</p></CardHeader><CardContent>
         {activities.length ? <div className="divide-y">{activities.map((item) => <div key={item.id} className="flex items-center gap-3 py-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">{item.type === "schedule" ? <CalendarDays className="h-4 w-4 text-primary" /> : <Clock3 className="h-4 w-4 text-primary" />}</div><div className="min-w-0 flex-1"><p className="text-sm font-medium">{item.title} · {dateLabel(item.date)}</p><p className="truncate text-xs text-muted-foreground">{item.detail || "Sem detalhes adicionais"}</p></div><div className="shrink-0 text-right"><p className="text-sm font-semibold">{money(item.value)}</p><Badge variant={item.status === "Pago" ? "default" : item.status === "Confirmada" ? "secondary" : "outline"} className="mt-1 text-[10px]">{item.status}</Badge></div></div>)}</div> : <p className="py-8 text-center text-sm text-muted-foreground">Ainda não existem atividades registradas.</p>}
