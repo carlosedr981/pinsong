@@ -113,13 +113,14 @@ export default function EmployeeDashboard() {
     return Array.from(grouped.entries()).map(([environmentId, rows]) => {
       const total = rows.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
       const confirmed = rows.filter((row) => row.confirmed === true).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
-      const pending = rows.filter((row) => row.confirmed !== true).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      const pending = rows.filter((row) => row.confirmed !== true || (!row.paid_at && !row.payment_scheduled_for)).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      const scheduled = rows.filter((row) => !!row.payment_scheduled_for && !row.paid_at).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
       const paid = rows.filter((row) => !!row.paid_at).reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
       return {
         id: environmentId,
         name: environmentId === "no-environment" ? "Sem ambiente" : environmentNames[environmentId] || "Ambiente",
         rows: [...rows].sort((a, b) => a.date.localeCompare(b.date)),
-        total, confirmed, pending, paid,
+        total, confirmed, pending, scheduled, paid,
         allPaid: rows.length > 0 && rows.every((row) => !!row.paid_at),
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -129,7 +130,8 @@ export default function EmployeeDashboard() {
     confirmed: totals.confirmed + group.confirmed,
     pending: totals.pending + group.pending,
     paid: totals.paid + group.paid,
-  }), { total: 0, confirmed: 0, pending: 0, paid: 0 }), [financialGroups]);
+    scheduled: totals.scheduled + group.scheduled,
+  }), { total: 0, confirmed: 0, pending: 0, paid: 0, scheduled: 0 }), [financialGroups]);
 
   const paymentMix = [
     { name: "Pago em escalas", value: stats.paidValue },
@@ -222,7 +224,7 @@ export default function EmployeeDashboard() {
             <div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Total do período</p><p className="mt-1 font-bold">{money(financialTotals.total)}</p><p className="text-[11px] text-muted-foreground">{financialSchedules.length} registro(s)</p></div>
             <div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmado</p><p className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">{money(financialTotals.confirmed)}</p></div>
             <div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendente de confirmação</p><p className="mt-1 font-bold">{money(financialTotals.pending)}</p></div>
-            <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/30"><p className="text-xs text-muted-foreground">Já pago</p><p className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">{money(financialTotals.paid)}</p></div>
+            <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950/30"><p className="text-xs text-muted-foreground">Agendado</p><p className="mt-1 font-bold text-blue-700 dark:text-blue-400">{money(financialTotals.scheduled)}</p></div><div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/30"><p className="text-xs text-muted-foreground">Já pago</p><p className="mt-1 font-bold text-emerald-700 dark:text-emerald-400">{money(financialTotals.paid)}</p></div>
           </div>
           {financialGroups.length ? financialGroups.map((group) => (
             <div key={group.id} className="overflow-hidden rounded-xl border">
@@ -233,7 +235,8 @@ export default function EmployeeDashboard() {
               <div className="space-y-0 px-3">
                 {group.rows.map((schedule) => {
                   const isPaid = !!schedule.paid_at;
-                  const isConfirmed = schedule.confirmed === true;\n                  const isScheduled = !!schedule.payment_scheduled_for && !isPaid;
+                  const isConfirmed = schedule.confirmed === true;
+                  const isScheduled = !!schedule.payment_scheduled_for && !isPaid;
                   return <div key={schedule.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3 last:border-b-0">
                     <span className="w-12 shrink-0 font-semibold tabular-nums">{dateLabel(schedule.date).slice(0, 5)}</span>
                     <span className="min-w-0 flex-1 text-sm tabular-nums">{isConfirmed && <span className="mr-1" aria-label="Confirmado">🟢</span>}{schedule.start_time && schedule.end_time ? `${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}` : "Horário não definido"}</span>
@@ -246,6 +249,7 @@ export default function EmployeeDashboard() {
                 <div className="flex justify-between font-semibold"><span>Total do período</span><span>{money(group.total)}</span></div>
                 <div className="flex justify-between text-emerald-700 dark:text-emerald-400"><span>Confirmado</span><span>{money(group.confirmed)}</span></div>
                 <div className="flex justify-between text-muted-foreground"><span>Pendente</span><span>{money(group.pending)}</span></div>
+                <div className="flex justify-between text-blue-700 dark:text-blue-400"><span>Agendado</span><span>{money(group.scheduled)}</span></div>
                 <div className="flex justify-between font-medium text-emerald-700 dark:text-emerald-400"><span>Pago</span><span>{money(group.paid)}</span></div>
               </div>
             </div>
