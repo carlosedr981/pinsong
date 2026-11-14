@@ -135,8 +135,9 @@ export default function EmployeeDashboard() {
 
   const paymentMix = [
     { name: "Pago em escalas", value: stats.paidValue },
-    { name: "A receber confirmado", value: stats.pendingValue },
-    { name: "Aguardando confirmação", value: Math.max(0, stats.totalValue - stats.paidValue - stats.pendingValue) },
+    { name: "A receber (pendente)", value: stats.pendingValue },
+    { name: "Pagamento agendado", value: stats.scheduledValue },
+    { name: "Aguardando confirmação", value: Math.max(0, stats.totalValue - stats.paidValue - stats.pendingValue - stats.scheduledValue) },
   ].filter((x) => x.value > 0);
   const environmentBreakdown = useMemo(() => Object.entries(schedules.reduce((acc, s) => { const name = s.environment_id ? environmentNames[s.environment_id] || "Ambiente" : "Sem ambiente"; acc[name] = (acc[name] || 0) + Number(s.daily_rate || 0); return acc; }, {} as Record<string, number>)).map(([ambiente, valor]) => ({ ambiente, valor })).sort((a, b) => b.valor - a.valor), [schedules, environmentNames]);
   const shiftBreakdown = useMemo(() => { const counts = schedules.reduce((acc, s) => { const hour = Number((s.start_time || "00:00").slice(0, 2)); const key = hour >= 5 && hour < 12 ? "Manhã" : hour >= 12 && hour < 18 ? "Tarde" : hour >= 18 || hour < 5 ? "Noite" : "Não definido"; acc[key] = (acc[key] || 0) + 1; return acc; }, {} as Record<string, number>); return Object.entries(counts).map(([turno, quantidade]) => ({ turno, quantidade })); }, [schedules]);
