@@ -4,7 +4,7 @@ ALTER TABLE public.work_schedules
   ADD COLUMN IF NOT EXISTS payment_confirmed_by_employee_at TIMESTAMPTZ;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES ('payment-receipts', 'payment-receipts', false, 10485760, ARRAY['image/jpeg','image/png','image/webp','application/pdf'])
+VALUES ('payment-receipts', 'payment-receipts', false, 10485760, ARRAY['image/jpeg','image/png','image/webp'])
 ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 10485760,
   allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp','application/pdf'];
 
