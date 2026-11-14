@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Wallet, TrendingUp, Bank
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +15,7 @@ import { ptBR } from "date-fns/locale";
 const db = supabase as any;
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (value: string) => format(new Date(value + "T12:00:00"), "dd/MM/yyyy");
-type Schedule = { id: string; date: string; start_time: string | null; end_time: string | null; daily_rate: number | null; confirmed: boolean | null; paid_at: string | null; payment_scheduled_for: string | null; environment_id: string | null; notes: string | null };
+type Schedule = { id: string; date: string; start_time: string | null; end_time: string | null; daily_rate: number | null; confirmed: boolean | null; paid_at: string | null; payment_scheduled_for: string | null; payment_receipt_path: string | null; payment_confirmed_by_employee_at: string | null; environment_id: string | null; notes: string | null };
 type Registro = { id: string; timestamp: string; value_per_registro: number | null; paid: boolean; paid_at: string | null };
 
 export default function EmployeeDashboard() {
@@ -27,6 +28,8 @@ export default function EmployeeDashboard() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"6" | "12" | "all">("6");
   const [financialMonth, setFinancialMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [pendingReceipt, setPendingReceipt] = useState<{ path: string; url: string; ids: string[]; paidAt: string; amount: number } | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -35,7 +38,7 @@ export default function EmployeeDashboard() {
       setLoading(true);
       try {
         const [scheduleResult, registroResult] = await Promise.all([
-          db.from("work_schedules").select("id,date,start_time,end_time,daily_rate,confirmed,paid_at,payment_scheduled_for,environment_id,notes").eq("employee_id", user.id).order("date", { ascending: false }),
+          db.from("work_schedules").select("id,date,start_time,end_time,daily_rate,confirmed,paid_at,payment_scheduled_for,payment_receipt_path,payment_confirmed_by_employee_at,environment_id,notes").eq("employee_id", user.id).order("date", { ascending: false }),
           db.from("registros").select("id,timestamp,value_per_registro,paid,paid_at").eq("user_id", user.id).order("timestamp", { ascending: false }),
         ]);
         if (scheduleResult.error) throw scheduleResult.error;
@@ -62,6 +65,42 @@ export default function EmployeeDashboard() {
     load();
     return () => { active = false; };
   }, [user, toast]);
+
+  useEffect(() => {
+    if (!user || pendingReceipt) return;
+    const firstUnconfirmed = schedules.find((row) => !!row.paid_at && !!row.payment_receipt_path && !row.payment_confirmed_by_employee_at);
+    if (!firstUnconfirmed?.payment_receipt_path) return;
+    let active = true;
+    const loadReceipt = async () => {
+      setReceiptLoading(true);
+      const { data, error } = await db.storage.from("payment-receipts").createSignedUrl(firstUnconfirmed.payment_receipt_path!, 3600);
+      if (!active) return;
+      setReceiptLoading(false);
+      if (error) { toast({ variant: "destructive", title: "Comprovante indisponível", description: error.message }); return; }
+      const related = schedules.filter((row) => row.payment_receipt_path === firstUnconfirmed.payment_receipt_path && !!row.paid_at && !row.payment_confirmed_by_employee_at);
+      setPendingReceipt({ path: firstUnconfirmed.payment_receipt_path!, url: data.signedUrl, ids: related.map((row) => row.id), paidAt: firstUnconfirmed.paid_at!, amount: related.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0) });
+    };
+    loadReceipt();
+    return () => { active = false; };
+  }, [user, schedules, pendingReceipt, toast]);
+
+  const confirmReceipt = async () => {
+    if (!pendingReceipt) return;
+    try {
+      const { error } = await db.rpc("confirm_work_schedule_payment_receipt", { p_schedule_ids: pendingReceipt.ids });
+      if (error) throw error;
+      const confirmedAt = new Date().toISOString();
+      setSchedules((current) => current.map((row) => pendingReceipt.ids.includes(row.id) ? { ...row, payment_confirmed_by_employee_at: confirmedAt } : row));
+      setPendingReceipt(null);
+      toast({ title: "Comprovante confirmado", description: "Sua confirmação foi registrada." });
+    } catch (error: any) { toast({ variant: "destructive", title: "Não foi possível confirmar", description: error?.message || "Tente novamente." }); }
+  };
+
+  const openHistoricalReceipt = async (path: string) => {
+    const { data, error } = await db.storage.from("payment-receipts").createSignedUrl(path, 300);
+    if (error) { toast({ variant: "destructive", title: "Erro ao abrir comprovante", description: error.message }); return; }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
 
   const stats = useMemo(() => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -148,7 +187,15 @@ export default function EmployeeDashboard() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
-  return <div className="min-h-screen bg-background pb-8">
+  return <>
+    <Dialog open={!!pendingReceipt} onOpenChange={() => {}}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" onEscapeKeyDown={(event) => event.preventDefault()} onPointerDownOutside={(event) => event.preventDefault()}>
+        <DialogHeader><DialogTitle className="text-xl text-emerald-700 dark:text-emerald-400">Pagamento realizado!</DialogTitle><DialogDescription>O pagamento da sua quinzena foi efetuado. Confira o comprovante abaixo e confirme o recebimento da informação.</DialogDescription></DialogHeader>
+        {pendingReceipt && <div className="space-y-3"><div className="rounded-lg bg-emerald-50 p-3 text-sm dark:bg-emerald-950/30"><p><strong>Valor:</strong> {money(pendingReceipt.amount)}</p><p><strong>Data do pagamento:</strong> {format(new Date(pendingReceipt.paidAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p></div><img src={pendingReceipt.url} alt="Comprovante de pagamento" className="max-h-[48vh] w-full rounded-lg border bg-muted object-contain" /></div>}
+        <DialogFooter><Button className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={receiptLoading || !pendingReceipt} onClick={confirmReceipt}><CheckCircle2 className="mr-2 h-4 w-4" />Confirmado</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <div className="min-h-screen bg-background pb-8">
     <header className="gradient-hero px-4 pb-8 pt-7 text-primary-foreground">
       <div className="mx-auto max-w-6xl">
         <div className="flex items-center gap-3">
@@ -241,7 +288,7 @@ export default function EmployeeDashboard() {
                   return <div key={schedule.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3 last:border-b-0">
                     <span className="w-12 shrink-0 font-semibold tabular-nums">{dateLabel(schedule.date).slice(0, 5)}</span>
                     <span className="min-w-0 flex-1 text-sm tabular-nums">{isConfirmed && <span className="mr-1" aria-label="Confirmado">🟢</span>}{schedule.start_time && schedule.end_time ? `${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}` : "Horário não definido"}</span>
-                    <span className="font-medium tabular-nums">{money(Number(schedule.daily_rate || 0))}</span>
+                    <span className="font-medium tabular-nums">{money(Number(schedule.daily_rate || 0))}</span>{schedule.payment_receipt_path && <Button size="sm" variant="outline" className="h-8" onClick={() => openHistoricalReceipt(schedule.payment_receipt_path!)}>Ver comprovante</Button>}
                     <Badge variant={isPaid ? "default" : isScheduled ? "secondary" : isConfirmed ? "outline" : "outline"} className={isPaid ? "shrink-0 border-0 bg-emerald-600 text-white" : isScheduled ? "shrink-0 border-0 bg-blue-600 text-white" : "shrink-0"}>{isPaid ? "PAGO" : isScheduled ? "AGENDADO" : isConfirmed ? "PENDENTE" : "AGUARDANDO"}</Badge>{isScheduled && <span className="w-full pl-12 text-xs font-medium text-blue-700 dark:text-blue-400">Pagamento previsto para {dateLabel(schedule.payment_scheduled_for!)}</span>}
                   </div>;
                 })}
@@ -263,5 +310,6 @@ export default function EmployeeDashboard() {
       </CardContent></Card>
       <p className="px-1 text-center text-xs text-muted-foreground">Indicadores calculados com base nas escalas e nos registros vinculados à sua conta.</p>
     </main>
-  </div>;
+    </div>
+  </>;
 }
