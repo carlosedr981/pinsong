@@ -14,7 +14,7 @@ import { ptBR } from "date-fns/locale";
 const db = supabase as any;
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (value: string) => format(new Date(value + "T12:00:00"), "dd/MM/yyyy");
-type Schedule = { id: string; date: string; start_time: string | null; end_time: string | null; daily_rate: number | null; confirmed: boolean | null; paid_at: string | null; environment_id: string | null; notes: string | null };
+type Schedule = { id: string; date: string; start_time: string | null; end_time: string | null; daily_rate: number | null; confirmed: boolean | null; paid_at: string | null; payment_scheduled_for: string | null; environment_id: string | null; notes: string | null };
 type Registro = { id: string; timestamp: string; value_per_registro: number | null; paid: boolean; paid_at: string | null };
 
 export default function EmployeeDashboard() {
@@ -35,7 +35,7 @@ export default function EmployeeDashboard() {
       setLoading(true);
       try {
         const [scheduleResult, registroResult] = await Promise.all([
-          db.from("work_schedules").select("id,date,start_time,end_time,daily_rate,confirmed,paid_at,environment_id,notes").eq("employee_id", user.id).order("date", { ascending: false }),
+          db.from("work_schedules").select("id,date,start_time,end_time,daily_rate,confirmed,paid_at,payment_scheduled_for,environment_id,notes").eq("employee_id", user.id).order("date", { ascending: false }),
           db.from("registros").select("id,timestamp,value_per_registro,paid,paid_at").eq("user_id", user.id).order("timestamp", { ascending: false }),
         ]);
         if (scheduleResult.error) throw scheduleResult.error;
@@ -72,7 +72,8 @@ export default function EmployeeDashboard() {
     const totalValue = schedules.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const paidValue = paid.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const confirmedValue = confirmed.reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
-    const pendingValue = schedules.filter((s) => s.confirmed === true && !s.paid_at).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const scheduledValue = schedules.filter((s) => !!s.payment_scheduled_for && !s.paid_at).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
+    const pendingValue = schedules.filter((s) => s.confirmed === true && !s.paid_at && !s.payment_scheduled_for).reduce((sum, s) => sum + Number(s.daily_rate || 0), 0);
     const hours = schedules.reduce((sum, s) => {
       if (!s.start_time || !s.end_time) return sum;
       const [sh, sm] = s.start_time.split(":").map(Number);
@@ -87,7 +88,7 @@ export default function EmployeeDashboard() {
     const averageValue = schedules.length ? totalValue / schedules.length : 0;
     const confirmationRate = schedules.length ? confirmed.length / schedules.length * 100 : 0;
     const paymentRate = schedules.length ? paid.length / schedules.length * 100 : 0;
-    return { total: schedules.length, completed: completed.length, upcoming: upcoming.length, confirmed: confirmed.length, pending: schedules.filter((s) => s.confirmed !== true).length, paid: paid.length, totalValue, paidValue, confirmedValue, pendingValue, hours, registrationCount: registros.length, registrationValue, registrationPaid, registrationPending, averageValue, confirmationRate, paymentRate, totalReceived: paidValue + registrationPaid, totalPending: pendingValue + registrationPending };
+    return { total: schedules.length, completed: completed.length, upcoming: upcoming.length, confirmed: confirmed.length, pending: schedules.filter((s) => s.confirmed !== true).length, paid: paid.length, totalValue, paidValue, confirmedValue, pendingValue, scheduledValue, hours, registrationCount: registros.length, registrationValue, registrationPaid, registrationPending, averageValue, confirmationRate, paymentRate, totalReceived: paidValue + registrationPaid, totalPending: pendingValue + registrationPending };
   }, [schedules, registros]);
 
   const monthly = useMemo(() => {
@@ -138,7 +139,7 @@ export default function EmployeeDashboard() {
   const environmentBreakdown = useMemo(() => Object.entries(schedules.reduce((acc, s) => { const name = s.environment_id ? environmentNames[s.environment_id] || "Ambiente" : "Sem ambiente"; acc[name] = (acc[name] || 0) + Number(s.daily_rate || 0); return acc; }, {} as Record<string, number>)).map(([ambiente, valor]) => ({ ambiente, valor })).sort((a, b) => b.valor - a.valor), [schedules, environmentNames]);
   const shiftBreakdown = useMemo(() => { const counts = schedules.reduce((acc, s) => { const hour = Number((s.start_time || "00:00").slice(0, 2)); const key = hour >= 5 && hour < 12 ? "Manhã" : hour >= 12 && hour < 18 ? "Tarde" : hour >= 18 || hour < 5 ? "Noite" : "Não definido"; acc[key] = (acc[key] || 0) + 1; return acc; }, {} as Record<string, number>); return Object.entries(counts).map(([turno, quantidade]) => ({ turno, quantidade })); }, [schedules]);
   const activities = useMemo(() => [
-    ...schedules.map((s) => ({ id: "s-" + s.id, date: s.date, title: "Escala", detail: [s.start_time && s.end_time ? s.start_time.slice(0, 5) + "–" + s.end_time.slice(0, 5) : "", s.environment_id ? environmentNames[s.environment_id] || "Ambiente" : ""].filter(Boolean).join(" · "), value: Number(s.daily_rate || 0), status: s.paid_at ? "Pago" : s.confirmed ? "Confirmada" : "Aguardando confirmação", type: "schedule" })),
+    ...schedules.map((s) => ({ id: "s-" + s.id, date: s.date, title: "Escala", detail: [s.start_time && s.end_time ? s.start_time.slice(0, 5) + "–" + s.end_time.slice(0, 5) : "", s.environment_id ? environmentNames[s.environment_id] || "Ambiente" : ""].filter(Boolean).join(" · "), value: Number(s.daily_rate || 0), status: s.paid_at ? "Pago" : s.payment_scheduled_for ? "Agendado" : s.confirmed ? "A receber" : "Aguardando confirmação", type: "schedule" })),
     ...registros.map((r) => ({ id: "r-" + r.id, date: r.timestamp.slice(0, 10), title: "Registro de ponto", detail: format(new Date(r.timestamp), "HH:mm"), value: Number(r.value_per_registro || 0), status: r.paid ? "Pago" : "Pendente", type: "registro" })),
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8), [schedules, registros, environmentNames]);
 
@@ -232,12 +233,12 @@ export default function EmployeeDashboard() {
               <div className="space-y-0 px-3">
                 {group.rows.map((schedule) => {
                   const isPaid = !!schedule.paid_at;
-                  const isConfirmed = schedule.confirmed === true;
+                  const isConfirmed = schedule.confirmed === true;\n                  const isScheduled = !!schedule.payment_scheduled_for && !isPaid;
                   return <div key={schedule.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3 last:border-b-0">
                     <span className="w-12 shrink-0 font-semibold tabular-nums">{dateLabel(schedule.date).slice(0, 5)}</span>
                     <span className="min-w-0 flex-1 text-sm tabular-nums">{isConfirmed && <span className="mr-1" aria-label="Confirmado">🟢</span>}{schedule.start_time && schedule.end_time ? `${schedule.start_time.slice(0, 5)}-${schedule.end_time.slice(0, 5)}` : "Horário não definido"}</span>
                     <span className="font-medium tabular-nums">{money(Number(schedule.daily_rate || 0))}</span>
-                    <Badge variant={isPaid ? "default" : isConfirmed ? "secondary" : "outline"} className={isPaid ? "shrink-0 border-0 bg-emerald-600 text-white" : "shrink-0"}>{isPaid ? "PAGO" : isConfirmed ? "A RECEBER" : "AGUARDANDO"}</Badge>
+                    <Badge variant={isPaid ? "default" : isScheduled ? "secondary" : isConfirmed ? "outline" : "outline"} className={isPaid ? "shrink-0 border-0 bg-emerald-600 text-white" : isScheduled ? "shrink-0 border-0 bg-blue-600 text-white" : "shrink-0"}>{isPaid ? "PAGO" : isScheduled ? "AGENDADO" : isConfirmed ? "PENDENTE" : "AGUARDANDO"}</Badge>{isScheduled && <span className="w-full pl-12 text-xs font-medium text-blue-700 dark:text-blue-400">Pagamento previsto para {dateLabel(schedule.payment_scheduled_for!)}</span>}
                   </div>;
                 })}
               </div>
