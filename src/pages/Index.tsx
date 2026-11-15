@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "./Dashboard";
-import { PointRegistrationGuard } from "@/components/PointRegistrationGuard";
 
 export default function Index() {
   const { user, loading } = useAuth();
@@ -19,7 +18,6 @@ export default function Index() {
   return (
     <>
       <Dashboard />
-      <PointRegistrationGuard userId={user.id} />
     </>
   );
 }
