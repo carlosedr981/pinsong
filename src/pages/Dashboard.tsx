@@ -1,37 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Camera, Shield, MessageSquare, Users, Wallet, BarChart3 } from "lucide-react";
+import { Clock, LogOut, Shield, MessageSquare, Users, Wallet, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { CameraCapture } from "@/components/CameraCapture";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { ProfileEditDialog } from "@/components/ProfileEditDialog";
-import { RegistrosHierarchy } from "@/components/RegistrosHierarchy";
-import { PhotoZoomDialog } from "@/components/PhotoZoomDialog";
 import { WorkScheduleCard } from "@/components/WorkScheduleCard";
 import { ScheduleShareDialog } from "@/components/ScheduleShareDialog";
 import { useTicketNotifications } from "@/hooks/useTicketNotifications";
-import { addWatermarkToImage, dataURLtoBlob } from "@/lib/watermark";
-import { reverseGeocode } from "@/lib/geocoding";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-interface Registro {
-  id: string;
-  timestamp: string;
-  photo_url: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  address?: string | null;
-  paid: boolean;
-  paid_at?: string | null;
-  receipt_url?: string | null;
-  value_per_registro: number;
-}
 
 interface Profile {
   id: string;
@@ -49,17 +31,12 @@ interface Profile {
 }
 
 export default function Dashboard() {
-  const [registros, setRegistros] = useState<Registro[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCamera, setShowCamera] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isAdmin, setIsAdmin] = useState(false);
   const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
-  const [hourlyRate, setHourlyRate] = useState<number>(20);
   const [userEnvironmentId, setUserEnvironmentId] = useState<string | null>(null);
   const [scheduleStats, setScheduleStats] = useState({ total: 0, confirmed: 0, pending: 0, value: 0 });
   const [personalFinancial, setPersonalFinancial] = useState({ receivable: 0, pending: 0, firstReceivable: 0, firstPending: 0, secondReceivable: 0, secondPending: 0 });
@@ -90,12 +67,6 @@ export default function Dashboard() {
           pix_beneficiary_phone: profile.pix_beneficiary_phone || null,
           avatar_url: profile.avatar_url || null,
         });
-        const employeeRate = (profile as any).hourly_rate;
-        if (employeeRate) setHourlyRate(Number(employeeRate));
-        else {
-          const { data: settings } = await supabase.from("app_settings").select("value").eq("key", "global_hourly_rate").single();
-          if (settings) setHourlyRate(Number(settings.value));
-        }
       }
     };
     loadData();
@@ -117,21 +88,7 @@ export default function Dashboard() {
     checkAdminAndEnvironment();
   }, [user]);
 
-  const fetchRegistros = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase.from("registros").select("*").eq("user_id", user.id).order("timestamp", { ascending: false });
-      if (error) throw error;
-      setRegistros(data || []);
-    } catch (error) {
-      console.error("Error fetching registros:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => { fetchRegistros(); }, [fetchRegistros]);
-
+  useEffect(() => { setLoading(false); }, []);
   useEffect(() => {
     if (!user) return;
     const loadScheduleStats = async () => {
@@ -183,57 +140,10 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, [user, isAdmin]);
 
-  const handleCapture = async (imageDataUrl: string) => {
-    if (!user || !profile) return;
-    setProcessing(true);
-    try {
-      const timestamp = new Date();
-      const watermarkedImage = await addWatermarkToImage(imageDataUrl, { fullName: profile.full_name, timestamp });
-      const blob = dataURLtoBlob(watermarkedImage);
-      let latitude: number | null = null;
-      let longitude: number | null = null;
-      let address: string | null = null;
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true }));
-        latitude = position.coords.latitude;
-        longitude = position.coords.longitude;
-        const geocodeResult = await reverseGeocode(latitude, longitude);
-        if (geocodeResult) address = geocodeResult.address;
-      } catch {}
-      const dateStr = `${timestamp.getFullYear()}-${String(timestamp.getMonth() + 1).padStart(2, "0")}-${String(timestamp.getDate()).padStart(2, "0")}`;
-      let valuePerRegistro = hourlyRate;
-      const { data: schedule } = await supabase.from("work_schedules").select("start_time, end_time").eq("employee_id", user.id).eq("date", dateStr).maybeSingle();
-      if (schedule?.start_time && schedule?.end_time) {
-        const [startH, startM] = schedule.start_time.split(":").map(Number);
-        const [endH, endM] = schedule.end_time.split(":").map(Number);
-        const scheduledHours = endH + endM / 60 - (startH + startM / 60);
-        if (scheduledHours > 0) valuePerRegistro = scheduledHours * hourlyRate;
-      }
-      const fileName = `${user.id}/${timestamp.getTime()}.jpg`;
-      const { error: uploadError } = await supabase.storage.from("registros-photos").upload(fileName, blob, { contentType: "image/jpeg" });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from("registros-photos").getPublicUrl(fileName);
-      const { error: insertError } = await supabase.from("registros").insert({ user_id: user.id, timestamp: timestamp.toISOString(), photo_url: publicUrl, latitude, longitude, address, value_per_registro: valuePerRegistro });
-      if (insertError) throw insertError;
-      toast({ title: "Ponto registrado!", description: `Registro às ${format(timestamp, "HH:mm:ss")}` });
-      setShowCamera(false);
-      fetchRegistros();
-    } catch (error) {
-      console.error("Error registering ponto:", error);
-      toast({ variant: "destructive", title: "Erro ao registrar", description: "Não foi possível registrar o ponto. Tente novamente." });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   const handleProfileSave = () => { refetchProfile?.(); };
-  const lastRegistro = registros[0];
-  const todayRegistros = registros.filter((r) => new Date(r.timestamp).toDateString() === new Date().toDateString());
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
-      <PhotoZoomDialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)} photoUrl={selectedPhoto || ""} />
-      {showCamera && <CameraCapture onCapture={handleCapture} onCancel={() => setShowCamera(false)} isProcessing={processing} initialFacingMode="environment" />}
       <div className="gradient-hero rounded-b-[2rem] px-3 pb-20 pt-6 sm:p-4 sm:pb-20 sm:pt-8">
         <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -251,10 +161,9 @@ export default function Dashboard() {
         <div className="text-center"><div className="mb-2 flex items-center justify-center gap-2"><Clock className="h-5 w-5 text-primary-foreground/80" /><span className="text-sm text-primary-foreground/80">Hora Atual</span></div><p className="text-4xl font-bold tracking-normal text-primary-foreground sm:text-5xl">{format(currentTime, "HH:mm:ss")}</p><p className="mt-1 px-2 text-sm capitalize text-primary-foreground/80 sm:text-base">{format(currentTime, "EEEE, dd 'de' MMMM", { locale: ptBR })}</p></div>
       </div>
       <div className="mx-auto -mt-12 max-w-3xl space-y-4 px-3 pb-8 sm:space-y-6 sm:px-4">
-        <Card className="overflow-hidden border-0 shadow-xl"><CardContent className="p-4 sm:p-6"><div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Status de Hoje</p><p className="text-base font-semibold sm:text-lg">{todayRegistros.length} registro{todayRegistros.length !== 1 ? "s" : ""}</p></div>{lastRegistro && <div className="shrink-0 text-right"><p className="text-sm text-muted-foreground">Último Registro</p><p className="text-base font-semibold sm:text-lg">{format(new Date(lastRegistro.timestamp), "HH:mm")}</p></div>}</div><Button onClick={() => setShowCamera(true)} className="h-14 w-full text-base font-semibold gradient-primary shadow-glow sm:text-lg" size="lg"><Camera className="mr-2 h-6 w-6" />Registrar Ponto</Button></CardContent></Card>
+        <Card className="overflow-hidden border-0 shadow-xl"><CardContent className="p-4 sm:p-6"><div className="mb-2"><p className="text-sm text-muted-foreground">Controle de Hoje</p><p className="text-base font-semibold sm:text-lg">Acompanhamento pelas escalas</p></div><p className="text-sm text-muted-foreground">Suas atividades e confirmações são acompanhadas exclusivamente pelas escalas cadastradas.</p></CardContent></Card>
 <Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Resumo das escalas de hoje</p><p className="text-xs text-muted-foreground">Acompanhe rapidamente o que está confirmado.</p></div><Users className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Escalas</p><p className="text-xl font-bold">{scheduleStats.total}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Confirmadas</p><p className="text-xl font-bold">{scheduleStats.confirmed}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendentes</p><p className="text-xl font-bold">{scheduleStats.pending}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Valor previsto</p><p className="text-base font-bold">{scheduleStats.value.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></CardContent></Card><Card className="border-0 shadow-xl"><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Meu financeiro</p><p className="text-xs text-muted-foreground">Valores conforme as escalas programadas deste mês.</p></div><Wallet className="h-5 w-5 text-primary" /></div><div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">A receber</p><p className="text-xl font-bold">{personalFinancial.receivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div className="rounded-lg bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Pendente</p><p className="text-xl font-bold">{personalFinancial.pending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div><div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"><div className="rounded-lg border p-3"><p className="text-sm font-semibold">1ª quinzena · dias 1 a 15</p><div className="mt-2 grid grid-cols-2 gap-2"><div><p className="text-xs text-muted-foreground">Confirmado</p><p className="text-sm font-semibold">{personalFinancial.firstReceivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div><p className="text-xs text-muted-foreground">Pendente</p><p className="text-sm font-semibold">{personalFinancial.firstPending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></div><div className="rounded-lg border p-3"><p className="text-sm font-semibold">2ª quinzena · dias 16 ao fim</p><div className="mt-2 grid grid-cols-2 gap-2"><div><p className="text-xs text-muted-foreground">Confirmado</p><p className="text-sm font-semibold">{personalFinancial.secondReceivable.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div><div><p className="text-xs text-muted-foreground">Pendente</p><p className="text-sm font-semibold">{personalFinancial.secondPending.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p></div></div></div></div></CardContent></Card>
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
-        <RegistrosHierarchy registros={registros} onPhotoClick={setSelectedPhoto} />
         <ScheduleShareDialog isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} environmentId={userEnvironmentId} />
       </div>
     </div>
