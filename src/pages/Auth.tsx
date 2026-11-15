@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Clock, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Clock, Mail, Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,18 +15,12 @@ const loginSchema = z.object({
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
 });
 
-const signupSchema = loginSchema.extend({
-  fullName: z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
-});
-
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -34,53 +28,34 @@ export default function Auth() {
     if (user) navigate("/", { replace: true });
   }, [user, navigate]);
 
-  const validate = () => {
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     try {
-      if (isLogin) loginSchema.parse({ email, password });
-      else signupSchema.parse({ email, password, fullName });
+      loginSchema.parse({ email, password });
       setErrors({});
-      return true;
-    } catch (err) {
-      if (err instanceof z.ZodError) {
+    } catch (error) {
+      if (error instanceof z.ZodError) {
         const next: Record<string, string> = {};
-        err.errors.forEach((e) => { if (e.path[0]) next[e.path[0] as string] = e.message; });
+        error.errors.forEach((item) => { if (item.path[0]) next[item.path[0] as string] = item.message; });
         setErrors(next);
       }
-      return false;
+      return;
     }
-  };
 
-  const checkBlocked = async (userId: string) => {
-    const { data: profile } = await supabase.from("profiles").select("blocked").eq("id", userId).single();
-    if (profile?.blocked) {
-      toast({ variant: "destructive", title: "Acesso bloqueado", description: "Seu acesso foi bloqueado. Entre em contato com o administrador." });
-      await supabase.auth.signOut();
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
     setLoading(true);
     try {
-      if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          toast({ variant: "destructive", title: "Erro no login", description: error.message.includes("Invalid login credentials") ? "Email ou senha incorretos." : error.message });
-          return;
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast({ variant: "destructive", title: "Erro no login", description: error.message.includes("Invalid login credentials") ? "Email ou senha incorretos." : error.message });
+        return;
+      }
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: profile } = await supabase.from("profiles").select("blocked").eq("id", currentUser.id).single();
+        if (profile?.blocked) {
+          toast({ variant: "destructive", title: "Acesso bloqueado", description: "Seu acesso foi bloqueado. Entre em contato com o administrador." });
+          await supabase.auth.signOut();
         }
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser && !(await checkBlocked(currentUser.id))) return;
-      } else {
-        const { error } = await signUp(email, password, fullName);
-        if (error) {
-          toast({ variant: "destructive", title: "Erro no cadastro", description: error.message.includes("already registered") ? "Este email já está cadastrado." : error.message });
-          return;
-        }
-        toast({ title: "Conta criada!", description: "Você já pode fazer login. O administrador definirá seus ambientes." });
-        setIsLogin(true);
       }
     } finally {
       setLoading(false);
@@ -97,15 +72,14 @@ export default function Auth() {
       </div>
       <div className="flex-1 px-4 -mt-8">
         <Card className="max-w-md mx-auto shadow-xl border-0 animate-slide-up">
-          <CardHeader className="text-center"><CardTitle className="text-xl">{isLogin ? "Bem-vindo de volta" : "Criar conta"}</CardTitle><CardDescription>{isLogin ? "Entre com suas credenciais para acessar" : "Preencha os dados para criar sua conta"}</CardDescription></CardHeader>
+          <CardHeader className="text-center"><CardTitle className="text-xl">Bem-vindo de volta</CardTitle><CardDescription>Entre com suas credenciais para acessar</CardDescription></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && <div className="space-y-2"><Label htmlFor="fullName">Nome Completo</Label><div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="fullName" placeholder="Seu nome completo" value={fullName} onChange={(e) => setFullName(e.target.value)} className="pl-10" disabled={loading} /></div>{errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}</div>}
-              <div className="space-y-2"><Label htmlFor="email">Email</Label><div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" disabled={loading} /></div>{errors.email && <p className="text-xs text-destructive">{errors.email}</p>}</div>
-              <div className="space-y-2"><Label htmlFor="password">Senha</Label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="password" type="password" placeholder="••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" disabled={loading} /></div>{errors.password && <p className="text-xs text-destructive">{errors.password}</p>}</div>
-              <Button type="submit" className="w-full gradient-primary" disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : isLogin ? "Entrar" : "Criar Conta"}</Button>
+              <div className="space-y-2"><Label htmlFor="email">Email</Label><div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(event) => setEmail(event.target.value)} className="pl-10" disabled={loading} /></div>{errors.email && <p className="text-xs text-destructive">{errors.email}</p>}</div>
+              <div className="space-y-2"><Label htmlFor="password">Senha</Label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="password" type="password" placeholder="••••••" value={password} onChange={(event) => setPassword(event.target.value)} className="pl-10" disabled={loading} /></div>{errors.password && <p className="text-xs text-destructive">{errors.password}</p>}</div>
+              <Button type="submit" className="w-full gradient-primary" disabled={loading}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}</Button>
             </form>
-            <div className="mt-6 text-center"><button type="button" onClick={() => { setIsLogin(!isLogin); setErrors({}); }} className="text-sm text-primary hover:underline" disabled={loading}>{isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}</button></div>
+            <p className="mt-6 text-center text-xs text-muted-foreground">Novos funcionários recebem acesso diretamente do administrador global.</p>
           </CardContent>
         </Card>
       </div>
