@@ -149,13 +149,19 @@ export default function Dashboard() {
     let active = true;
     const loadPendingReceipt = async () => {
       const { data: rows, error } = await (supabase as any).from("work_schedules")
-        .select("id,daily_rate,paid_at,payment_receipt_path,payment_confirmed_by_employee_at")
-        .eq("employee_id", user.id).not("paid_at", "is", null)
-        .not("payment_receipt_path", "is", null).is("payment_confirmed_by_employee_at", null)
+        .select("id,date,daily_rate,paid_at,payment_receipt_path,payment_confirmed_by_employee_at")
+        .eq("employee_id", user.id)
         .order("paid_at", { ascending: true });
       if (!active || error || !rows?.length) return;
-      const first = rows[0];
-      const related = rows.filter((row: any) => row.payment_receipt_path === first.payment_receipt_path);
+      const first = rows.find((row: any) => !!row.paid_at && !!row.payment_receipt_path && !row.payment_confirmed_by_employee_at);
+      if (!first) return;
+      const related = rows.filter((row: any) => row.payment_receipt_path === first.payment_receipt_path && !!row.paid_at && !row.payment_confirmed_by_employee_at);
+      const paymentMonth = String(first.date || "").slice(0, 7);
+      const paymentDay = Number(String(first.date || "").slice(8, 10));
+      const isFirstFortnight = paymentDay <= 15;
+      const totalForFortnight = rows
+        .filter((row: any) => String(row.date || "").slice(0, 7) === paymentMonth && (isFirstFortnight ? Number(String(row.date || "").slice(8, 10)) <= 15 : Number(String(row.date || "").slice(8, 10)) > 15))
+        .reduce((sum: number, row: any) => sum + Number(row.daily_rate || 0), 0);
       setReceiptLoading(true);
       const { data, error: signedUrlError } = await (supabase as any).storage.from("payment-receipts").createSignedUrl(first.payment_receipt_path, 3600);
       if (!active) return;
@@ -164,7 +170,7 @@ export default function Dashboard() {
         toast({ variant: "destructive", title: "Comprovante indisponível", description: signedUrlError.message });
         return;
       }
-      setPendingReceipt({ url: data.signedUrl, ids: related.map((row: any) => row.id), paidAt: first.paid_at, amount: related.reduce((sum: number, row: any) => sum + Number(row.daily_rate || 0), 0) });
+      setPendingReceipt({ url: data.signedUrl, ids: related.map((row: any) => row.id), paidAt: first.paid_at, amount: totalForFortnight });
     };
     loadPendingReceipt();
     return () => { active = false; };
