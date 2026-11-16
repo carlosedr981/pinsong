@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, LogOut, Shield, MessageSquare, Users, Wallet, BarChart3 } from "lucide-react";
+import { Clock, LogOut, Shield, MessageSquare, Users, Wallet, BarChart3, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,6 +41,8 @@ export default function Dashboard() {
   const [userEnvironmentId, setUserEnvironmentId] = useState<string | null>(null);
   const [scheduleStats, setScheduleStats] = useState({ total: 0, confirmed: 0, pending: 0, value: 0 });
   const [personalFinancial, setPersonalFinancial] = useState({ receivable: 0, pending: 0, firstReceivable: 0, firstPending: 0, secondReceivable: 0, secondPending: 0 });
+  const [pendingReceipt, setPendingReceipt] = useState<{ url: string; ids: string[]; paidAt: string; amount: number } | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
   const { user, profile, signOut, refetchProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -140,10 +143,70 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, [user, isAdmin]);
 
+
+  useEffect(() => {
+    if (!user || isAdmin || pendingReceipt) return;
+    let active = true;
+    const loadPendingReceipt = async () => {
+      const { data: rows, error } = await (supabase as any).from("work_schedules")
+        .select("id,daily_rate,paid_at,payment_receipt_path,payment_confirmed_by_employee_at")
+        .eq("employee_id", user.id).not("paid_at", "is", null)
+        .not("payment_receipt_path", "is", null).is("payment_confirmed_by_employee_at", null)
+        .order("paid_at", { ascending: true });
+      if (!active || error || !rows?.length) return;
+      const first = rows[0];
+      const related = rows.filter((row: any) => row.payment_receipt_path === first.payment_receipt_path);
+      setReceiptLoading(true);
+      const { data, error: signedUrlError } = await (supabase as any).storage.from("payment-receipts").createSignedUrl(first.payment_receipt_path, 3600);
+      if (!active) return;
+      setReceiptLoading(false);
+      if (signedUrlError) {
+        toast({ variant: "destructive", title: "Comprovante indisponível", description: signedUrlError.message });
+        return;
+      }
+      setPendingReceipt({ url: data.signedUrl, ids: related.map((row: any) => row.id), paidAt: first.paid_at, amount: related.reduce((sum: number, row: any) => sum + Number(row.daily_rate || 0), 0) });
+    };
+    loadPendingReceipt();
+    return () => { active = false; };
+  }, [user, isAdmin, pendingReceipt, toast]);
+
+  const confirmPaymentReceipt = async () => {
+    if (!pendingReceipt) return;
+    try {
+      const { error } = await (supabase as any).rpc("confirm_work_schedule_payment_receipt", { p_schedule_ids: pendingReceipt.ids });
+      if (error) throw error;
+      setPendingReceipt(null);
+      toast({ title: "Comprovante confirmado", description: "Sua confirmação foi registrada." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Não foi possível confirmar", description: error?.message || "Tente novamente." });
+    }
+  };
+
   const handleProfileSave = () => { refetchProfile?.(); };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background">
+    <>
+      <Dialog open={!!pendingReceipt} onOpenChange={() => {}}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" onEscapeKeyDown={(event) => event.preventDefault()} onPointerDownOutside={(event) => event.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-xl text-emerald-700 dark:text-emerald-400">Pagamento realizado!</DialogTitle>
+            <DialogDescription>Um pagamento foi realizado. Confira o comprovante abaixo e confirme o recebimento da informação.</DialogDescription>
+          </DialogHeader>
+          {pendingReceipt && <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-50 p-3 text-sm dark:bg-emerald-950/30">
+              <p><strong>Valor:</strong> {pendingReceipt.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
+              <p><strong>Data do pagamento:</strong> {format(new Date(pendingReceipt.paidAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+            </div>
+            <img src={pendingReceipt.url} alt="Comprovante de pagamento" className="max-h-[48vh] w-full rounded-lg border bg-muted object-contain" />
+          </div>}
+          <DialogFooter>
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={receiptLoading || !pendingReceipt} onClick={confirmPaymentReceipt}>
+              <CheckCircle2 className="mr-2 h-4 w-4" />Confirmado
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="min-h-screen overflow-x-hidden bg-background">
       <div className="gradient-hero rounded-b-[2rem] px-3 pb-20 pt-6 sm:p-4 sm:pb-20 sm:pt-8">
         <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -166,6 +229,7 @@ export default function Dashboard() {
         {user && <WorkScheduleCard isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} userId={user.id} environmentId={userEnvironmentId} />}
         <ScheduleShareDialog isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} environmentId={userEnvironmentId} />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
