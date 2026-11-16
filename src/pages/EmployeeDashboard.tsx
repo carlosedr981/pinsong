@@ -71,7 +71,13 @@ export default function EmployeeDashboard() {
       setReceiptLoading(false);
       if (error) { toast({ variant: "destructive", title: "Comprovante indisponível", description: error.message }); return; }
       const related = schedules.filter((row) => row.payment_receipt_path === firstUnconfirmed.payment_receipt_path && !!row.paid_at && !row.payment_confirmed_by_employee_at);
-      setPendingReceipt({ path: firstUnconfirmed.payment_receipt_path!, url: data.signedUrl, ids: related.map((row) => row.id), paidAt: firstUnconfirmed.paid_at!, amount: related.reduce((sum, row) => sum + Number(row.daily_rate || 0), 0) });
+      const paymentMonth = firstUnconfirmed.date.slice(0, 7);
+      const paymentDay = Number(firstUnconfirmed.date.slice(8, 10));
+      const isFirstFortnight = paymentDay <= 15;
+      const totalForFortnight = schedules
+        .filter((row) => row.date.slice(0, 7) === paymentMonth && (isFirstFortnight ? Number(row.date.slice(8, 10)) <= 15 : Number(row.date.slice(8, 10)) > 15))
+        .reduce((sum, row) => sum + Number(row.daily_rate || 0), 0);
+      setPendingReceipt({ path: firstUnconfirmed.payment_receipt_path!, url: data.signedUrl, ids: related.map((row) => row.id), paidAt: firstUnconfirmed.paid_at!, amount: totalForFortnight });
     };
     loadReceipt();
     return () => { active = false; };
