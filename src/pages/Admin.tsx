@@ -48,7 +48,12 @@ export default function Admin() {
     setCreatingEmployee(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-employee", { body: { fullName, email, password: newEmployeePassword } });
-      if (error) throw error;
+      if (error) {
+        let detail = error.message || "Não foi possível criar a conta.";
+        try { const response = error.context; if (response && typeof response.json === "function") { const payload = await response.json(); if (payload?.error) detail = payload.error; } } catch {}
+        if (/Failed to send|fetch/i.test(detail)) detail = "Não foi possível conectar à Edge Function create-employee. Ela precisa estar implantada no mesmo projeto Supabase configurado no site.";
+        throw new Error(detail);
+      }
       if (data?.error) throw new Error(data.error);
       toast({ title: "Funcionário criado", description: fullName + " já pode acessar o sistema." });
       setCreateEmployeeOpen(false); setNewEmployeeName(""); setNewEmployeeEmail(""); setNewEmployeePassword(""); await fetchData();
